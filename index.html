@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POISUTE 2 - TRASH CAM MONITOR</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            box-sizing: border-box;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        #ui-layer::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .cam-title {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .rec-icon {
+            color: red;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        #status {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 14px;
+            color: #888;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="cam-title">
+            <span class="rec-icon">● REC</span> CAM-01 : TRASH AREA
+        </div>
+        <div id="status">SYS: STANDBY...</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111); 
+        
+        // ▼ 変更：イラストに合わせた斜め上からの見下ろし画角
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 8, 12); 
+        camera.lookAt(0, -1, 0);       
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        scene.add(directionalLight);
+
+        const TRASH_COUNT = 7;
+        const SPACING = 1.4; 
+
+        // ゴミ箱の読み込み
+        const mtlLoader = new MTLLoader();
+        mtlLoader.load('GarbageCan.mtl', (materials) => {
+            materials.preload();
+            const objLoader = new OBJLoader();
+            objLoader.setMaterials(materials);
+            
+            objLoader.load('GarbageCan.obj', (object) => {
+                object.scale.set(1.5, 1.5, 1.5);
+                for (let i = 0; i < TRASH_COUNT; i++) {
+                    const clone = object.clone();
+                    const posX = (i - Math.floor(TRASH_COUNT / 2)) * SPACING;
+                    clone.position.set(posX, -1, 0);
+                    scene.add(clone);
+                }
+            });
+        });
+
+        const fallingItems = [];
+        const textureLoader = new THREE.TextureLoader();
+
+        // ▼ 変更：指定されたゴミ箱に画像を落とす
+        function dropItem(trashId, imageName) {
+            // スプレッドシートの1〜7を、プログラム上の0〜6に変換
+            const safeIndex = (Math.max(1, Math.min(trashId, TRASH_COUNT)) - 1);
+            const posX = (safeIndex - Math.floor(TRASH_COUNT / 2)) * SPACING;
+
+            let material;
+            if (imageName && imageName.trim() !== "") {
+                const itemTexture = textureLoader.load(imageName); 
+                // transparent: true で背景の透過PNGに対応
+                material = new THREE.SpriteMaterial({ map: itemTexture, transparent: true });
+            } else {
+                material = new THREE.SpriteMaterial({ color: 0xff007f });
+            }
+            
+            // Sprite（常にカメラの方向を向く板）として生成
+            const item = new THREE.Sprite(material);
+            item.scale.set(1.2, 1.2, 1.2); // 画像の大きさ
+            
+            item.position.set(posX, 7, 0);
+            scene.add(item);
+
+            fallingItems.push({
+                mesh: item,
+                velocity: 0,
+                bounces: 0
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            fallingItems.forEach(item => {
+                // Y座標が0（ゴミ箱の中）より上なら落下
+                if (item.mesh.position.y > 0) {
+                    item.velocity += 0.006; 
+                    item.mesh.position.y -= item.velocity;
+                } else if (item.bounces < 2) {
+                    item.mesh.position.y = 0;
+                    item.velocity = -item.velocity * 0.3;
+                    item.bounces++;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- GASとの通信 ---
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
+        
+        let isFetching = false;
+        let lastDataString = ""; 
+        let previousClearedState = []; 
+
+        async function fetchData() {
+            if (isFetching) return; 
+            isFetching = true;
+
+            try {
+                const response = await fetch(GAS_URL);
+                const data = await response.json();
+                const currentDataString = JSON.stringify(data);
+                
+                if (lastDataString !== currentDataString) {
+                    updateUIAndCheckDrops(data);
+                    lastDataString = currentDataString;
+                }
+                document.getElementById('status').innerText = "SYS: ONLINE 🟢";
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status').innerText = "SYS: ERROR 🔴";
+            } finally {
+                isFetching = false;
+                setTimeout(fetchData, 2000); 
+            }
+        }
+
+        function updateUIAndCheckDrops(data) {
+            const currentClearedState = [];
+
+            data.missions.forEach((m, index) => {
+                currentClearedState[index] = m.cleared;
+
+                if (m.cleared && previousClearedState[index] === false) {
+                    // チェックが入った瞬間、指定のゴミ箱に指定の画像を落とす
+                    dropItem(m.trashId, m.imageName); 
+                }
+            });
+            previousClearedState = currentClearedState;
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
