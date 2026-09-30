@@ -51,7 +51,7 @@
         window.addEventListener('keydown', (e) => {
             if (e.key === 'r' || e.key === 'R') {
                 localStorage.setItem('poisuteStartTime', Date.now());
-                location.reload(); // 3Dのゴミも全部消して完全にリセット
+                location.reload(); 
             }
         });
 
@@ -143,7 +143,6 @@
         
         let isFetching = false;
         let previousClearedState = []; 
-        let droppedAutoHints = {}; // 自動ヒント落下済みの記録
 
         async function fetchData() {
             if (isFetching) return; 
@@ -165,18 +164,12 @@
             const currentClearedState = [];
             
             data.missions.forEach((m, index) => {
-                // ① クリア判定による落下
                 currentClearedState[index] = m.cleared;
+                
+                // ▼変更箇所：D列（クリア）にチェックがついた瞬間だけアイテムを落とす
                 if (m.cleared && previousClearedState[index] === false) {
-                    dropItem(); // クリア時はデフォルトのゴミを落とす
-                }
-
-                // ② 時間経過による自動ヒントの落下
-                if (m.hintTime > 0 && currentElapsedMinutes >= m.hintTime) {
-                    if (!droppedAutoHints[index] && m.hintImage) {
-                        dropItem(m.hintImage);
-                        droppedAutoHints[index] = true; // 同じヒントが何個も落ちないように記録
-                    }
+                    // I列に画像指定(m.hintImage)があればそれを、無ければ白いゴミを落とす
+                    dropItem(m.hintImage); 
                 }
             });
             previousClearedState = currentClearedState;
