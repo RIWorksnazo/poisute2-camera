@@ -5,73 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POISUTE 2 - TRASH CAM MONITOR</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            color: #fff;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            display: block;
-        }
-
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; 
-            box-sizing: border-box;
-            padding: 20px;
-            z-index: 10;
-        }
-
+        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-sizing: border-box; padding: 20px; z-index: 10; }
         #ui-layer::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
+            content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.25) 50%), linear-gradient(90deg, rgba(255,0,0,0.06), rgba(0,255,0,0.02), rgba(0,0,255,0.06));
+            z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
-
-        .cam-title {
-            position: absolute;
-            top: 20px;
-            left: 30px;
-            font-size: 24px;
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 2px 2px 0 #000;
-        }
-
-        .rec-icon {
-            color: red;
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-            0% { opacity: 1; }
-            50% { opacity: 0; }
-            100% { opacity: 1; }
-        }
-
-        #status {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            font-size: 14px;
-            color: #888;
-        }
+        .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
+        .rec-icon { color: red; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+        #footer-info { position: absolute; bottom: 20px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 16px; color: #888; }
+        #timer { color: #ff0; font-weight: bold; }
     </style>
-    
     <script type="importmap">
         {
             "imports": {
@@ -82,107 +29,105 @@
     </script>
 </head>
 <body>
-
     <div id="canvas-container"></div>
-
     <div id="ui-layer">
-        <div class="cam-title">
-            <span class="rec-icon">● REC</span> CAM-01 : TRASH AREA
+        <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
+        <div id="footer-info">
+            <div id="timer">ELAPSED TIME: 00:00</div>
+            <div id="status">SYS: STANDBY...</div>
         </div>
-        <div id="status">SYS: STANDBY...</div>
     </div>
 
     <script type="module">
         import * as THREE from 'three';
-        import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
-        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+        // タイマー設定 (Rキーでリセット＆画面リフレッシュ)
+        let startTime = localStorage.getItem('poisuteStartTime');
+        if (!startTime) {
+            startTime = Date.now();
+            localStorage.setItem('poisuteStartTime', startTime);
+        }
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                localStorage.setItem('poisuteStartTime', Date.now());
+                location.reload(); // 3Dのゴミも全部消して完全にリセット
+            }
+        });
+
+        let currentElapsedMinutes = 0;
+        function updateTimerDisplay() {
+            const elapsedMs = Date.now() - startTime;
+            currentElapsedMinutes = Math.floor(elapsedMs / 60000);
+            const seconds = Math.floor((elapsedMs % 60000) / 1000);
+            document.getElementById('timer').innerText = `ELAPSED TIME: ${String(currentElapsedMinutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        setInterval(updateTimerDisplay, 1000);
+
+        // 3Dシーンのセットアップ
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x111111); 
+        scene.background = new THREE.Color(0x050505); 
         
-        // ▼ 変更：イラストに合わせた斜め上からの見下ろし画角
-       const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 4, 7);  // 
-        camera.lookAt(0, -0.5, 0);        // 
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 8, 15); 
+        camera.lookAt(0, 0, 0);       
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         container.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 5);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        directionalLight.position.set(0, 10, 10);
         scene.add(directionalLight);
 
-        const TRASH_COUNT = 7;
-        const SPACING = 2.2; 
+        const textureLoader = new THREE.TextureLoader();
 
-        // ゴミ箱の読み込み
-        const mtlLoader = new MTLLoader();
-        mtlLoader.load('GarbageCan.mtl', (materials) => {
-            materials.preload();
-            const objLoader = new OBJLoader();
-            objLoader.setMaterials(materials);
-            
-            objLoader.load('GarbageCan.obj', (object) => {
-                object.scale.set(3.0, 3.0, 3.0);
-                for (let i = 0; i < TRASH_COUNT; i++) {
-                    const clone = object.clone();
-                    const posX = (i - Math.floor(TRASH_COUNT / 2)) * SPACING;
-                    clone.position.set(posX, -1, 0);
-                    scene.add(clone);
-                }
-            });
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load('GarbageCan.glb', (gltf) => {
+            const giantTrash = gltf.scene;
+            giantTrash.scale.set(8.0, 8.0, 8.0);
+            giantTrash.position.set(0, -3, 0);   
+            scene.add(giantTrash);
         });
 
         const fallingItems = [];
-        const textureLoader = new THREE.TextureLoader();
 
-        // ▼ 変更：指定されたゴミ箱に画像を落とす
-        function dropItem(trashId, imageName) {
-            // スプレッドシートの1〜7を、プログラム上の0〜6に変換
-            const safeIndex = (Math.max(1, Math.min(trashId, TRASH_COUNT)) - 1);
-            const posX = (safeIndex - Math.floor(TRASH_COUNT / 2)) * SPACING;
+        function dropItem(imageName) {
+            const randomX = (Math.random() - 0.5) * 6;
+            const randomZ = (Math.random() - 0.5) * 2;
+            const landY = (Math.random() * 2) - 1; 
 
             let material;
             if (imageName && imageName.trim() !== "") {
                 const itemTexture = textureLoader.load(imageName); 
-                // transparent: true で背景の透過PNGに対応
                 material = new THREE.SpriteMaterial({ map: itemTexture, transparent: true });
             } else {
-                material = new THREE.SpriteMaterial({ color: 0xff007f });
+                material = new THREE.SpriteMaterial({ color: 0xffffff }); // 画像指定がない場合は白い四角
             }
             
-            // Sprite（常にカメラの方向を向く板）として生成
             const item = new THREE.Sprite(material);
-            item.scale.set(1.2, 1.2, 1.2); // 画像の大きさ
-            
-            item.position.set(posX, 7, 0);
+            item.scale.set(2.0, 2.0, 2.0); 
+            item.position.set(randomX, 12, randomZ); 
             scene.add(item);
 
-            fallingItems.push({
-                mesh: item,
-                velocity: 0,
-                bounces: 0
-            });
+            fallingItems.push({ mesh: item, velocity: 0, bounces: 0, landY: landY });
         }
 
         function animate() {
             requestAnimationFrame(animate);
-
             fallingItems.forEach(item => {
-                // Y座標が0（ゴミ箱の中）より上なら落下
-                if (item.mesh.position.y > 0) {
-                    item.velocity += 0.006; 
+                if (item.mesh.position.y > item.landY) {
+                    item.velocity += 0.008; 
                     item.mesh.position.y -= item.velocity;
                 } else if (item.bounces < 2) {
-                    item.mesh.position.y = 0;
-                    item.velocity = -item.velocity * 0.3;
+                    item.mesh.position.y = item.landY;
+                    item.velocity = -item.velocity * 0.3; 
                     item.bounces++;
                 }
             });
-
             renderer.render(scene, camera);
         }
         animate();
@@ -193,29 +138,22 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- GASとの通信 ---
+        // GAS通信
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
-        let lastDataString = ""; 
         let previousClearedState = []; 
+        let droppedAutoHints = {}; // 自動ヒント落下済みの記録
 
         async function fetchData() {
             if (isFetching) return; 
             isFetching = true;
-
             try {
                 const response = await fetch(GAS_URL);
                 const data = await response.json();
-                const currentDataString = JSON.stringify(data);
-                
-                if (lastDataString !== currentDataString) {
-                    updateUIAndCheckDrops(data);
-                    lastDataString = currentDataString;
-                }
+                updateUIAndCheckDrops(data);
                 document.getElementById('status').innerText = "SYS: ONLINE 🟢";
             } catch (error) {
-                console.error(error);
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
                 isFetching = false;
@@ -225,13 +163,20 @@
 
         function updateUIAndCheckDrops(data) {
             const currentClearedState = [];
-
+            
             data.missions.forEach((m, index) => {
+                // ① クリア判定による落下
                 currentClearedState[index] = m.cleared;
-
                 if (m.cleared && previousClearedState[index] === false) {
-                    // チェックが入った瞬間、指定のゴミ箱に指定の画像を落とす
-                    dropItem(m.trashId, m.imageName); 
+                    dropItem(); // クリア時はデフォルトのゴミを落とす
+                }
+
+                // ② 時間経過による自動ヒントの落下
+                if (m.hintTime > 0 && currentElapsedMinutes >= m.hintTime) {
+                    if (!droppedAutoHints[index] && m.hintImage) {
+                        dropItem(m.hintImage);
+                        droppedAutoHints[index] = true; // 同じヒントが何個も落ちないように記録
+                    }
                 }
             });
             previousClearedState = currentClearedState;
