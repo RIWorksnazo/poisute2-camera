@@ -16,8 +16,7 @@
         .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
         .rec-icon { color: red; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
-        #footer-info { position: absolute; bottom: 20px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 16px; color: #888; }
-        #timer { color: #ff0; font-weight: bold; }
+        #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; }
     </style>
     <script type="importmap">
         {
@@ -33,7 +32,6 @@
     <div id="ui-layer">
         <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
         <div id="footer-info">
-            <div id="timer">ELAPSED TIME: 00:00</div>
             <div id="status">SYS: STANDBY...</div>
         </div>
     </div>
@@ -42,27 +40,12 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // タイマー設定 (Rキーでリセット＆画面リフレッシュ)
-        let startTime = localStorage.getItem('poisuteStartTime');
-        if (!startTime) {
-            startTime = Date.now();
-            localStorage.setItem('poisuteStartTime', startTime);
-        }
+        // Rキーで画面をリフレッシュし、溜まったゴミを消去する機能だけ残す
         window.addEventListener('keydown', (e) => {
             if (e.key === 'r' || e.key === 'R') {
-                localStorage.setItem('poisuteStartTime', Date.now());
                 location.reload(); 
             }
         });
-
-        let currentElapsedMinutes = 0;
-        function updateTimerDisplay() {
-            const elapsedMs = Date.now() - startTime;
-            currentElapsedMinutes = Math.floor(elapsedMs / 60000);
-            const seconds = Math.floor((elapsedMs % 60000) / 1000);
-            document.getElementById('timer').innerText = `ELAPSED TIME: ${String(currentElapsedMinutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
-        setInterval(updateTimerDisplay, 1000);
 
         // 3Dシーンのセットアップ
         const container = document.getElementById('canvas-container');
@@ -105,7 +88,7 @@
                 const itemTexture = textureLoader.load(imageName); 
                 material = new THREE.SpriteMaterial({ map: itemTexture, transparent: true });
             } else {
-                material = new THREE.SpriteMaterial({ color: 0xffffff }); // 画像指定がない場合は白い四角
+                material = new THREE.SpriteMaterial({ color: 0xffffff });
             }
             
             const item = new THREE.Sprite(material);
@@ -166,9 +149,8 @@
             data.missions.forEach((m, index) => {
                 currentClearedState[index] = m.cleared;
                 
-                // ▼変更箇所：D列（クリア）にチェックがついた瞬間だけアイテムを落とす
+                // D列（クリア）にチェックがついた瞬間だけアイテムを落とす
                 if (m.cleared && previousClearedState[index] === false) {
-                    // I列に画像指定(m.hintImage)があればそれを、無ければ白いゴミを落とす
                     dropItem(m.hintImage); 
                 }
             });
