@@ -8,13 +8,13 @@
         body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-sizing: border-box; padding: 20px; z-index: 10; }
-        /* 画質低下フィルター（linear-gradient）を削除し、クリアな表示にしました */
         .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
         .rec-icon { color: red; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
         .drop-status.off { color: #f44336; }
+        .debug-text { font-size: 14px; color: #00ff00; margin-top: 5px; font-weight: bold; }
     </style>
     <script type="importmap">
         {
@@ -32,18 +32,13 @@
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
+            <div id="debug-text" class="debug-text">Tキーでテスト落下</div>
         </div>
     </div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'r' || e.key === 'R') {
-                location.reload(); 
-            }
-        });
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
@@ -55,27 +50,26 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // 影の設定を有効化（オプション）
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // 全体の明るさ
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); 
         scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0); // 太陽のようなメインの光
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0); 
         directionalLight.position.set(5, 15, 10);
-        directionalLight.castShadow = true; // 光源から影を落とす
+        directionalLight.castShadow = true; 
         scene.add(directionalLight);
 
         const textureLoader = new THREE.TextureLoader();
+        textureLoader.setCrossOrigin('anonymous'); // エラー防止の強化
 
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('GarbageCan.glb', (gltf) => {
             const giantTrash = gltf.scene;
             giantTrash.scale.set(8.0, 8.0, 8.0);
             giantTrash.position.set(0, -3, 0);
-            // ゴミ箱も影を受けるように設定
             giantTrash.traverse((child) => {
                 if (child.isMesh) {
                     child.receiveShadow = true;
@@ -86,10 +80,10 @@
         });
 
         const fallingItems = [];
-        // ゴミの基本となる立体の形（幅、高さ、奥行き）
         const boxGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
 
-        function dropItem(imageName) {
+        // 外部から呼べるようにする
+        window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0;
             let isOverlapping = true;
@@ -115,7 +109,6 @@
             let material;
             if (imageName && imageName.trim() !== "") {
                 const itemTexture = textureLoader.load(imageName); 
-                // 光を反射する立体的でリアルな素材に変更（MeshStandardMaterial）
                 material = new THREE.MeshStandardMaterial({ 
                     map: itemTexture, 
                     roughness: 0.7, 
@@ -125,12 +118,10 @@
                 material = new THREE.MeshStandardMaterial({ color: 0xffffff });
             }
             
-            // 2D（Sprite）から 3D（Mesh）に変更
             const item = new THREE.Mesh(boxGeometry, material);
             item.position.set(randomX, 12, randomZ); 
-            // 落ちる向きをランダムに
             item.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-            item.castShadow = true; // ゴミ自身も影を落とす
+            item.castShadow = true; 
             scene.add(item);
 
             fallingItems.push({ 
@@ -140,12 +131,17 @@
                 landY: landY, 
                 landX: randomX, 
                 landZ: randomZ,
-                // 回転スピードをランダムに設定
                 rotSpeedX: (Math.random() - 0.5) * 0.2,
                 rotSpeedY: (Math.random() - 0.5) * 0.2,
                 rotSpeedZ: (Math.random() - 0.5) * 0.2
             });
         }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') location.reload(); 
+            // ▼ Tキーでテスト落下
+            if (e.key === 't' || e.key === 'T') window.dropItem(""); 
+        });
 
         function animate() {
             requestAnimationFrame(animate);
@@ -153,7 +149,6 @@
                 if (item.mesh.position.y > item.landY) {
                     item.velocity += 0.008; 
                     item.mesh.position.y -= item.velocity;
-                    // 落下中はくるくる回転させる
                     item.mesh.rotation.x += item.rotSpeedX;
                     item.mesh.rotation.y += item.rotSpeedY;
                     item.mesh.rotation.z += item.rotSpeedZ;
@@ -161,7 +156,6 @@
                     item.mesh.position.y = item.landY;
                     item.velocity = -item.velocity * 0.3; 
                     item.bounces++;
-                    // バウンドした時に少し回転を変える
                     item.rotSpeedX *= 0.5;
                     item.rotSpeedY *= 0.5;
                 }
@@ -207,17 +201,33 @@
 
         function updateUIAndCheckDrops(data) {
             const currentClearedState = [];
+            let isOColumnRecognized = false;
             
             data.missions.forEach((m, index) => {
                 currentClearedState[index] = m.cleared;
                 
+                // O列に1つでもチェックが入っているか確認
+                if (m.dropItem === true) {
+                    isOColumnRecognized = true;
+                }
+                
                 if (m.cleared && previousClearedState[index] === false) {
                     if (data.isDropEnabled && m.dropItem) {
-                        dropItem(m.hintImage); 
+                        window.dropItem(m.hintImage); 
                     }
                 }
             });
             previousClearedState = currentClearedState;
+            
+            // ▼ 画面右下にO列の認識状況を表示
+            const debugText = document.getElementById('debug-text');
+            if (isOColumnRecognized) {
+                debugText.innerText = "【通信OK】O列のチェック認識中 / Tキーでテスト落下";
+                debugText.style.color = "#00ff00";
+            } else {
+                debugText.innerText = "【警告】O列のチェックが1つも認識されていません！";
+                debugText.style.color = "#ff5252";
+            }
         }
 
         fetchData();
