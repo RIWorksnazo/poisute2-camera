@@ -83,27 +83,27 @@
                 attempts++;
             }
 
-            let material;
+            // 画像の読み込み処理（エラーに強い非同期貼り付け）
+            const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 });
 
-            // ▼ ここが修正した「3Dの最強の読み込み方」です
             if (imageName && imageName.trim() !== "") {
                 let url = imageName.trim();
                 if (!url.startsWith('http')) {
                     url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
                 }
                 
-                // 初めから「これは画像を貼る前提の箱だぞ」と教え込む
-                const texture = textureLoader.load(url);
-                texture.colorSpace = THREE.SRGBColorSpace;
-                
-                material = new THREE.MeshStandardMaterial({ 
-                    map: texture, 
-                    color: 0xffffff,
-                    roughness: 0.7, 
-                    metalness: 0.1 
-                });
-            } else {
-                material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 });
+                textureLoader.load(
+                    url,
+                    function(texture) {
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        material.map = texture;
+                        material.needsUpdate = true;
+                    },
+                    undefined,
+                    function(err) {
+                        console.warn("画像読み込みエラー: " + url);
+                    }
+                );
             }
             
             const item = new THREE.Mesh(boxGeometry, material);
@@ -145,12 +145,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // ▼いただいたGASのURLを初めから設定済みです！
+        // いただいたGASのURL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
-        let droppedMissions = new Set();
-        let isFirstLoad = true;
+        let droppedMissions = new Set(); // 落下済みのものを記録（無限ループ落下防止）
 
         async function fetchData() {
             if (isFetching) return; 
@@ -178,18 +177,18 @@
             data.missions.forEach((m, index) => {
                 const uniqueKey = m.name || `mission_${index}`;
                 
+                // ▼ 変更：「D(cleared)」と「O(dropItem)」と「Q2(isDropEnabled)」が全部ONなら落とす
                 if (m.cleared && m.dropItem && data.isDropEnabled) {
-                    if (!isFirstLoad && !droppedMissions.has(uniqueKey)) {
+                    // まだこの画面上で落としていないものなら、即座に落とす（開いた瞬間でも落ちる）
+                    if (!droppedMissions.has(uniqueKey)) {
                         window.dropItem(m.hintImage || ""); 
-                        droppedMissions.add(uniqueKey); 
-                    } else if (isFirstLoad) {
                         droppedMissions.add(uniqueKey); 
                     }
                 } else if (!m.cleared) {
+                    // チェックが外れたら記録から消す（次にチェックを入れたらまた落ちる）
                     droppedMissions.delete(uniqueKey);
                 }
             });
-            isFirstLoad = false;
         }
 
         fetchData();
