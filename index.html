@@ -14,15 +14,6 @@
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
         .drop-status.off { color: #f44336; }
-        .debug-text { font-size: 14px; color: #00ff00; margin-top: 5px; font-weight: bold; }
-        
-        /* ▼追加：画面左側にスプレッドシートの状況をリアルタイム表示するモニター */
-        #live-monitor {
-            position: absolute; top: 70px; left: 30px; font-size: 13px; color: rgba(255,255,255,0.8);
-            line-height: 1.6; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;
-        }
-        .status-on { color: #00e676; font-weight: bold; }
-        .status-off { color: #ff5252; }
     </style>
     <script type="importmap">
         {
@@ -37,13 +28,9 @@
     <div id="canvas-container"></div>
     <div id="ui-layer">
         <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
-        <!-- ▼追加：ライブモニター表示エリア -->
-        <div id="live-monitor">SYSTEM BOOTING...</div>
-        
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
-            <div id="debug-text" class="debug-text">Tキーでテスト落下</div>
         </div>
     </div>
 
@@ -93,11 +80,13 @@
         const fallingItems = [];
         const boxGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
 
+        // ゴミを落とす機能
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0;
             let isOverlapping = true;
 
+            // 重ならないように空きスペースを探す
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
@@ -116,7 +105,7 @@
                 attempts++;
             }
 
-            // ▼変更：とりあえず先に白箱を作り、画像は後から貼り付ける（画像エラーで止まるのを防ぐ）
+            // 画像の読み込み処理（エラー時は白い箱になる）
             const material = new THREE.MeshStandardMaterial({ 
                 color: 0xffffff, 
                 roughness: 0.7, 
@@ -129,10 +118,6 @@
                     function(texture) {
                         material.map = texture;
                         material.needsUpdate = true;
-                    },
-                    undefined,
-                    function(err) {
-                        console.warn('画像が読み込めません:', imageName);
                     }
                 );
             }
@@ -156,11 +141,7 @@
             });
         }
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'r' || e.key === 'R') location.reload(); 
-            if (e.key === 't' || e.key === 'T') window.dropItem(""); 
-        });
-
+        // アニメーションループ
         function animate() {
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
@@ -190,21 +171,23 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // --------------------------------------------------------
+        // ▼ 変更が必要な場合はここだけ ▼
+        // 今使っているGASのURLを入れてください（変更がない場合はこのままでOK）
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
+        // --------------------------------------------------------
         
-        let isFetching = false;
-        let previousClearedState = []; 
+        let previousClearedState = null; 
 
         async function fetchData() {
-            if (isFetching) return; 
-            isFetching = true;
             try {
+                // キャッシュを完全に無視して最新データを強制取得
                 const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
-                updateUIAndCheckDrops(data);
-                document.getElementById('status').innerText = "SYS: ONLINE 🟢";
                 
+                document.getElementById('status').innerText = "SYS: ONLINE 🟢";
                 const dropIndicator = document.getElementById('drop-indicator');
+                
                 if (data.isDropEnabled) {
                     dropIndicator.innerText = "DROP: ON (ENABLED)";
                     dropIndicator.className = "drop-status";
@@ -212,50 +195,27 @@
                     dropIndicator.innerText = "DROP: OFF (DISABLED)";
                     dropIndicator.className = "drop-status off";
                 }
+
+                // 画面を開いて最初の1回目の読み込みは状態を記録するだけ
+                if (previousClearedState === null) {
+                    previousClearedState = data.missions.map(m => m.cleared);
+                } else {
+                    // 2回目以降の読み込みで「D列が新しくONになった」ものを探して落とす
+                    data.missions.forEach((m, index) => {
+                        if (m.cleared === true && previousClearedState[index] === false) {
+                            if (data.isDropEnabled && m.dropItem) {
+                                window.dropItem(m.hintImage || ""); 
+                            }
+                        }
+                        // 状態を更新
+                        previousClearedState[index] = m.cleared;
+                    });
+                }
             } catch (error) {
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
+                // 1秒ごとにスプレッドシートを確認しに行く
                 setTimeout(fetchData, 1000); 
-            }
-        }
-
-        function updateUIAndCheckDrops(data) {
-            const currentClearedState = [];
-            let isOColumnRecognized = false;
-            let monitorHTML = "<b>▼ LIVE SPREADSHEET MONITOR ▼</b><br>";
-            
-            data.missions.forEach((m, index) => {
-                currentClearedState[index] = m.cleared;
-                
-                if (m.dropItem === true) {
-                    isOColumnRecognized = true;
-                }
-
-                // 左側のモニターに全ミッションの状態を書き出す
-                if (m.name) {
-                    let dStatus = m.cleared ? '<span class="status-on">ON</span>' : '<span class="status-off">OFF</span>';
-                    let oStatus = m.dropItem ? '<span class="status-on">ON</span>' : '<span class="status-off">OFF</span>';
-                    monitorHTML += `D(クリア): ${dStatus} | O(個別落下): ${oStatus} | ${m.name.substring(0, 10)}...<br>`;
-                }
-                
-                // 初回読み込み時（previousClearedStateが空）は落下させない。2回目以降でOFF→ONになった時だけ落とす
-                if (previousClearedState.length > 0 && m.cleared === true && previousClearedState[index] === false) {
-                    if (data.isDropEnabled && m.dropItem) {
-                        window.dropItem(m.hintImage || ""); 
-                    }
-                }
-            });
-
-            document.getElementById('live-monitor').innerHTML = monitorHTML;
-            previousClearedState = currentClearedState;
-            
-            const debugText = document.getElementById('debug-text');
-            if (isOColumnRecognized) {
-                debugText.innerText = "【通信OK】O列のチェック認識中 / Tキーでテスト落下";
-                debugText.style.color = "#00ff00";
-            } else {
-                debugText.innerText = "【警告】O列のチェックが1つも認識されていません！";
-                debugText.style.color = "#ff5252";
             }
         }
 
