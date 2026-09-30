@@ -5,25 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POISUTE 2 - TRASH CAM MONITOR</title>
     <style>
-        /* 背景色を明るめ（#d0d0d0）にしました。文字が見えにくくならないように影をつけています */
-        body { margin: 0; overflow: hidden; background-color: #d0d0d0; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-sizing: border-box; padding: 20px; z-index: 10; }
         
+        /* ▼ LIVEの文字と、ゆったりした点滅アニメーション（2s） */
         .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 4px #000; }
-        .rec-icon { color: red; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
-        
-        #live-monitor {
-            position: absolute; top: 70px; left: 30px; font-size: 14px; color: rgba(255,255,255,0.95);
-            background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; line-height: 1.8;
-            max-height: 70vh; overflow: hidden;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+        .live-icon { color: red; animation: slowBlink 2s infinite ease-in-out; }
+        @keyframes slowBlink { 
+            0% { opacity: 1; } 
+            50% { opacity: 0.2; } 
+            100% { opacity: 1; } 
         }
         
-        #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; text-align: right; line-height: 1.5; text-shadow: 1px 1px 3px #000; }
-        .drop-status { font-weight: bold; color: #ffeb3b; }
-        .debug-text { font-size: 14px; color: #00e676; margin-top: 5px; font-weight:bold; }
+        /* 右下のエラー確認用ログ（最小限残しています） */
+        #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; text-align: right; line-height: 1.5; text-shadow: 1px 1px 3px #000; opacity: 0.5; }
+        .debug-text { font-size: 12px; color: #00e676; margin-top: 5px; }
     </style>
     <script type="importmap">
         {
@@ -37,11 +34,14 @@
 <body>
     <div id="canvas-container"></div>
     <div id="ui-layer">
-        <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
-        <div id="live-monitor">通信を待機中...</div>
+        <!-- ▼ テキストをLIVEのみに変更 -->
+        <div class="cam-title"><span class="live-icon">● LIVE</span></div>
+        
+        <!-- 通信モニターは完全に削除しました -->
+        
         <div id="footer-info">
-            <div id="status">SYS: STANDBY...</div>
-            <div id="monitor-log" class="debug-text">システム起動。Tキーでテスト落下</div>
+            <div id="status">SYS: STANDBY</div>
+            <div id="monitor-log" class="debug-text">T: DROP TEST</div>
         </div>
     </div>
 
@@ -50,12 +50,12 @@
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        // ▼ 背景を明るめのグレーに変更
-        scene.background = new THREE.Color(0xd0d0d0); 
+        scene.background = new THREE.Color(0x111111); // 箱の外の暗闇
         
+        // カメラ設定：箱の手前から奥を見下ろすアングル
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 12, 26); 
-        camera.lookAt(0, -3, 0);       
+        camera.position.set(0, 15, 35); 
+        camera.lookAt(0, -5, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -63,21 +63,38 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // 背景が明るいので、ライトも少し強めに当てて画像をくっきりさせます
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.5); 
+        // ▼ 【追加】奥行きのある「大きな入れ物（箱）」を作ります
+        const boxGeometry = new THREE.BoxGeometry(60, 40, 60);
+        const boxMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xcccccc,       // 箱の壁・床の色（明るめのグレー）
+            side: THREE.BackSide,  // 箱の「内側」を描画する
+            roughness: 0.9 
+        });
+        const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
+        bigBox.position.set(0, 10, 0); // 箱の中心。床は -10 の高さになります
+        bigBox.receiveShadow = true;   // 箱の床や壁に影を落とす
+        scene.add(bigBox);
+
+        // 照明設定：箱の中に綺麗な影が落ちるように調整
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
         scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0); 
-        directionalLight.position.set(5, 15, 10);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0); 
+        directionalLight.position.set(0, 25, 20); // 手前の上から照らす
         directionalLight.castShadow = true; 
+        // 影のクオリティを少し上げます
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.left = -30;
+        directionalLight.shadow.camera.right = 30;
+        directionalLight.shadow.camera.top = 30;
+        directionalLight.shadow.camera.bottom = -30;
         scene.add(directionalLight);
 
         const textureLoader = new THREE.TextureLoader();
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        
-        // ▼ 厚みのある箱（Box）をやめて、枠線のないペラペラの平面（Plane）に戻しました！
         const panelGeometry = new THREE.PlaneGeometry(4.5, 4.5); 
 
         window.dropItem = function(imageName) {
@@ -86,17 +103,18 @@
                 let attempts = 0, isOverlapping = true;
                 
                 while (isOverlapping && attempts < 500) {
-                    randomX = (Math.random() - 0.5) * 24; 
-                    randomZ = (Math.random() * -16) + 4; 
+                    // 箱の広さ（横幅と奥行き）に合わせてランダムに散らす
+                    randomX = (Math.random() - 0.5) * 40; 
+                    randomZ = (Math.random() * -30) + 10; 
                     
-                    // 奥にいくほど、着地位置が高くなる（立体感の計算はキープ！）
-                    landY = -6 - (randomZ * 0.15); 
+                    // 床の高さは y = -10。画像が半分床にめり込まないよう、少し浮かせた -7.5 を着地地点に。
+                    landY = -7.5; 
                     
                     isOverlapping = false;
                     for (const item of fallingItems) {
                         const dx = item.landX - randomX;
                         const dz = item.landZ - randomZ;
-                        if (Math.sqrt(dx * dx + dz * dz) < 4.2) { 
+                        if (Math.sqrt(dx * dx + dz * dz) < 4.5) { 
                             isOverlapping = true; break; 
                         } 
                     }
@@ -113,16 +131,14 @@
                     const texture = textureLoader.load(url);
                     texture.colorSpace = THREE.SRGBColorSpace;
                     
-                    // ▼ そのままの画像を貼るだけのシンプルな設定
                     material = new THREE.MeshStandardMaterial({ 
                         map: texture, 
                         color: 0xffffff, 
                         roughness: 0.8, 
                         transparent: true,
-                        side: THREE.DoubleSide // 裏から見ても透けないように
+                        side: THREE.DoubleSide
                     });
                 } else {
-                    // 画像がない時はただの白い紙
                     material = new THREE.MeshStandardMaterial({ 
                         color: 0xffffff, 
                         roughness: 0.8,
@@ -131,8 +147,8 @@
                 }
                 
                 const item = new THREE.Mesh(panelGeometry, material);
-                item.position.set(randomX, 25, randomZ); 
-                item.quaternion.copy(camera.quaternion); 
+                item.position.set(randomX, 30, randomZ); // 天井付近から落下スタート
+                item.quaternion.copy(camera.quaternion); // 常にカメラを向く
                 item.castShadow = true; 
                 scene.add(item);
 
@@ -151,7 +167,7 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    item.velocity += 0.02; 
+                    item.velocity += 0.025; // 落下速度
                     item.mesh.position.y -= item.velocity;
                 } else {
                     item.mesh.position.y = item.landY; 
@@ -166,9 +182,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // いつものGAS URLです
+        // 通信処理
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
-        
         let isFetching = false;
         let knownMissions = {}; 
         let isFirstLoad = true;
@@ -180,9 +195,11 @@
                 const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
-                document.getElementById('status').innerText = "SYS: ONLINE 🟢";
+                document.getElementById('status').innerText = "SYS: ONLINE";
+                document.getElementById('status').style.color = "#888";
             } catch (error) {
-                document.getElementById('status').innerText = "SYS: ERROR 🔴";
+                document.getElementById('status').innerText = "SYS: ERROR";
+                document.getElementById('status').style.color = "#ff5252";
             } finally {
                 isFetching = false; 
                 setTimeout(fetchData, 1000); 
@@ -190,7 +207,6 @@
         }
 
         function updateUIAndCheckDrops(data) {
-            let monitorHTML = "<b>▼ リアルタイム通信モニター ▼</b><br>";
             let logText = "";
 
             data.missions.forEach((m, index) => {
@@ -198,23 +214,25 @@
                     const name = String(m.name || m.hintImage || `mission_${index}`);
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
-                    let statusText = isCleared ? '<span style="color:#00e676; font-weight:bold;">ON </span>' : '<span style="color:#ff5252;">OFF</span>';
-                    monitorHTML += `[D列: ${statusText}] ${String(m.name || `MIS-${index}`).substring(0,10)}...<br>`;
-                    
                     if (isCleared && !knownMissions[name]) {
                         if (!isFirstLoad) {
                             window.dropItem(m.hintImage || ""); 
-                            logText = "落下実行: " + String(m.name || "不明なミッション");
+                            logText = "DROP: " + String(m.name || "ITEM").substring(0,6);
                         }
                     }
                     knownMissions[name] = isCleared;
                 } catch (err) {
-                    console.error("ミッション処理エラー:", err);
+                    // エラーは無視して次に進む
                 }
             });
             
-            document.getElementById('live-monitor').innerHTML = monitorHTML;
-            if (logText) document.getElementById('monitor-log').innerText = logText;
+            if (logText) {
+                const logEl = document.getElementById('monitor-log');
+                logEl.innerText = logText;
+                // 新しいものが落ちたら文字を少し光らせる演出
+                logEl.style.color = "#fff";
+                setTimeout(() => { logEl.style.color = "#00e676"; }, 500);
+            }
             
             isFirstLoad = false;
         }
