@@ -12,7 +12,6 @@
         .rec-icon { color: red; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
         
-        /* ▼追加：画面左上のライブモニター */
         #live-monitor {
             position: absolute; top: 70px; left: 30px; font-size: 14px; color: rgba(255,255,255,0.9);
             background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; line-height: 1.8;
@@ -36,10 +35,7 @@
     <div id="canvas-container"></div>
     <div id="ui-layer">
         <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
-        
-        <!-- ここにスプレッドシートの状況がリアルタイムで映ります -->
         <div id="live-monitor">通信を待機中...</div>
-        
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="monitor-log" class="debug-text">Tキーでテスト落下</div>
@@ -75,29 +71,32 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        
-        // ▼ 変更：厚み（0.2）のある立派なパネルボードを作ります
         const panelGeometry = new THREE.BoxGeometry(4.0, 4.0, 0.2); 
 
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0, isOverlapping = true;
-
-            while (isOverlapping && attempts < 500) {
-                randomX = (Math.random() - 0.5) * 20; 
-                randomZ = (Math.random() * -12) + 6;  
-                landY = (Math.random() * 2) - 1.0; 
+            
+            // ▼ 修正：すでに落ちているパネルと「4.5」以上の距離を必ず取るように計算させる
+            while (isOverlapping && attempts < 1000) {
+                randomX = (Math.random() - 0.5) * 26; // 画面の横幅いっぱいに散らす
+                landY = (Math.random() - 0.5) * 12;   // 画面の上下に散らす
+                randomZ = Math.random() * -5;         
+                
                 isOverlapping = false;
                 for (const item of fallingItems) {
                     const dx = item.landX - randomX;
-                    const dz = item.landZ - randomZ;
-                    if (Math.sqrt(dx * dx + dz * dz) < 2.5) { isOverlapping = true; break; } 
+                    const dy = item.landY - landY;
+                    // 斜めの距離を測って、近すぎたらやり直し！
+                    if (Math.sqrt(dx * dx + dy * dy) < 4.5) { 
+                        isOverlapping = true; break; 
+                    } 
                 }
                 attempts++;
             }
 
             let material;
-            const sideMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }); // 側面は白
+            const sideMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
 
             if (imageName && imageName.trim() !== "") {
                 let url = imageName.trim();
@@ -108,22 +107,22 @@
                 texture.colorSpace = THREE.SRGBColorSpace;
                 
                 const faceMaterial = new THREE.MeshStandardMaterial({ map: texture, color: 0xffffff, roughness: 0.8 });
-                // 箱の6面のうち、正面と裏面だけに画像を貼る（キャンバスボード風）
                 material = [sideMaterial, sideMaterial, sideMaterial, sideMaterial, faceMaterial, faceMaterial];
             } else {
-                material = sideMaterial; // 画像がない時は全部白
+                material = sideMaterial; 
             }
             
             const item = new THREE.Mesh(panelGeometry, material);
-            item.position.set(randomX, 18, randomZ); 
+            // 最初は画面の上の見えない位置にセット
+            item.position.set(randomX, 20, randomZ); 
             
-            // ▼ 変更：常にカメラ（モニター）の方向を真正面に向かせる
+            // 常にカメラを向かせる
             item.quaternion.copy(camera.quaternion);
-            
             item.castShadow = true; 
             scene.add(item);
 
-            fallingItems.push({ mesh: item, velocity: 0, landY: landY });
+            // ▼ 修正：ここに landX と landY を記録するのを忘れていたため、重なり判定が壊れていました！
+            fallingItems.push({ mesh: item, velocity: 0, landX: randomX, landY: landY, landZ: randomZ });
         }
 
         window.addEventListener('keydown', (e) => {
@@ -135,7 +134,6 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    // クルクル回らずに、スッと加速しながら落ちる
                     item.velocity += 0.015; 
                     item.mesh.position.y -= item.velocity;
                 } else {
@@ -151,11 +149,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // 賢徳さんのGAS URL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
-        let knownMissions = {}; // 前回通信した時のチェック状態を記憶する場所
+        let knownMissions = {}; 
         let isFirstLoad = true;
 
         async function fetchData() {
@@ -174,29 +171,24 @@
         }
 
         function updateUIAndCheckDrops(data) {
+            const masterDrop = (data.isDropEnabled !== false); 
             let monitorHTML = "<b>▼ リアルタイム通信モニター ▼</b><br>";
             let logText = "";
 
             data.missions.forEach((m, index) => {
                 const name = m.name || `mission_${index}`;
-                // 文字列の "TRUE" も確実に true として扱う
                 const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
-                // 左上の画面に状況を表示
                 let statusText = isCleared ? '<span style="color:#00e676; font-weight:bold;">ON </span>' : '<span style="color:#ff5252;">OFF</span>';
                 monitorHTML += `[D列: ${statusText}] ${name.substring(0,10)}...<br>`;
                 
-                // ▼ここが究極にシンプルな落下判定！
-                // 「今はON」かつ「前回はOFF（または未記録）だった」なら落とす！
                 if (isCleared && !knownMissions[name]) {
-                    // ただし、画面を開いた瞬間に最初からONだったものは落とさない
                     if (!isFirstLoad) {
                         window.dropItem(m.hintImage || ""); 
                         logText = "落下を検知: " + name;
                     }
                 }
                 
-                // 「今の状態」を記憶に上書きする（次にチェックが外れたらOFFとして記憶される）
                 knownMissions[name] = isCleared;
             });
             
