@@ -14,8 +14,6 @@
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
         .drop-status.off { color: #f44336; }
-        /* ▼ 追加：画像が読み込めているか画面で確認するための特大文字 */
-        .debug-text { font-size: 18px; color: #00ff00; margin-top: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 5px;}
     </style>
     <script type="importmap">
         {
@@ -34,8 +32,6 @@
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
-            <!-- ここに画像読み込みの結果が出ます -->
-            <div id="debug-text" class="debug-text">画像レーダー：待機中...</div>
         </div>
     </div>
 
@@ -75,49 +71,39 @@
             let attempts = 0, isOverlapping = true;
 
             while (isOverlapping && attempts < 500) {
-                randomX = (Math.random() - 0.5) * 20; randomZ = (Math.random() * -12) + 6; landY = -0.5; 
+                randomX = (Math.random() - 0.5) * 20; 
+                randomZ = (Math.random() * -12) + 6;  
+                landY = -0.5; 
                 isOverlapping = false;
                 for (const item of fallingItems) {
-                    const dx = item.landX - randomX; const dz = item.landZ - randomZ;
+                    const dx = item.landX - randomX;
+                    const dz = item.landZ - randomZ;
                     if (Math.sqrt(dx * dx + dz * dz) < 2.0) { isOverlapping = true; break; }
                 }
                 attempts++;
             }
 
-            // まず真っ白の箱の素材を作る
-            const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 });
-            const debugText = document.getElementById('debug-text');
+            let material;
 
+            // ▼ ここが修正した「3Dの最強の読み込み方」です
             if (imageName && imageName.trim() !== "") {
                 let url = imageName.trim();
-                
-                // 【超重要】もし http から始まっていなければ、強制的にGitHubのフルアドレスをくっつける！
                 if (!url.startsWith('http')) {
                     url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
                 }
-
-                debugText.innerText = "⏳ 読込中: " + url;
-                debugText.style.color = "#ffff00"; // 黄色
-
-                // 画像を読み込んで、後から箱に貼り付ける処理
-                textureLoader.load(
-                    url,
-                    function(texture) {
-                        texture.colorSpace = THREE.SRGBColorSpace;
-                        material.map = texture;
-                        material.needsUpdate = true; // 貼り付け更新！
-                        debugText.innerText = "✅ 成功!: 画像が貼られました";
-                        debugText.style.color = "#00ff00"; // 緑色
-                    },
-                    undefined,
-                    function(err) {
-                        debugText.innerText = "❌ 失敗!: 画像が見つかりません (" + url + ")";
-                        debugText.style.color = "#ff5252"; // 赤色
-                    }
-                );
+                
+                // 初めから「これは画像を貼る前提の箱だぞ」と教え込む
+                const texture = textureLoader.load(url);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                
+                material = new THREE.MeshStandardMaterial({ 
+                    map: texture, 
+                    color: 0xffffff,
+                    roughness: 0.7, 
+                    metalness: 0.1 
+                });
             } else {
-                debugText.innerText = "⚠️ 画像の指定なし（白箱）";
-                debugText.style.color = "#aaaaaa";
+                material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 });
             }
             
             const item = new THREE.Mesh(boxGeometry, material);
@@ -159,7 +145,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // ▼▼▼ 必ず最新のGAS URLに書き換えてください！ ▼▼▼
+        // ▼いただいたGASのURLを初めから設定済みです！
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
@@ -174,6 +160,13 @@
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
                 document.getElementById('status').innerText = "SYS: ONLINE 🟢";
+                
+                const dropIndicator = document.getElementById('drop-indicator');
+                if (data.isDropEnabled) {
+                    dropIndicator.innerText = "DROP: ON (ENABLED)"; dropIndicator.className = "drop-status";
+                } else {
+                    dropIndicator.innerText = "DROP: OFF (DISABLED)"; dropIndicator.className = "drop-status off";
+                }
             } catch (error) {
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
