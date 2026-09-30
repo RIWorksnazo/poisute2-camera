@@ -46,16 +46,18 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
+        // ▼ アイテムが大きくなったので、カメラを少し後ろ（上）に引いて全体を見やすくしました
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 15, 35); 
+        camera.position.set(0, 18, 42); 
         camera.lookAt(0, -5, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = false;
+        renderer.shadowMap.enabled = false; // 影なし（軽量化）
         container.appendChild(renderer.domElement);
 
-        const boxGeometry = new THREE.BoxGeometry(60, 40, 60);
+        // ▼ 部屋（箱）もひと回り大きくしました
+        const boxGeometry = new THREE.BoxGeometry(80, 50, 80);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
             side: THREE.BackSide,  
@@ -77,8 +79,8 @@
 
         const fallingItems = [];
         
-        // ▼ 1920x1080 (16:9) に合わせて、横8.0 縦4.5 に変更しました！
-        const panelGeometry = new THREE.PlaneGeometry(8.0, 4.5); 
+        // ▼ アイテムの縦横を2倍（16.0 x 9.0）の特大サイズに変更！
+        const panelGeometry = new THREE.PlaneGeometry(16.0, 9.0); 
 
         window.dropItem = function(imageName) {
             try {
@@ -86,8 +88,9 @@
                 let attempts = 0, isOverlapping = true;
                 
                 while (isOverlapping && attempts < 500) {
-                    randomX = (Math.random() - 0.5) * 40; 
-                    randomZ = (Math.random() * -30) + 10; 
+                    // アイテムが大きいので、散らばる範囲も広げました
+                    randomX = (Math.random() - 0.5) * 50; 
+                    randomZ = (Math.random() * -35) + 10; 
                     
                     landY = -6.0; 
                     
@@ -95,8 +98,8 @@
                     for (const item of fallingItems) {
                         const dx = item.landX - randomX;
                         const dz = item.landZ - randomZ;
-                        // ▼ 横長になった分、重なり判定の距離を少しだけ広げました（6.8 → 8.5）
-                        if (Math.sqrt(dx * dx + dz * dz) < 8.5) { 
+                        // ▼ 重なり判定もアイテムサイズに合わせて広げました（13.0）
+                        if (Math.sqrt(dx * dx + dz * dz) < 13.0) { 
                             isOverlapping = true; break; 
                         } 
                     }
@@ -141,7 +144,7 @@
                 }
                 
                 const item = new THREE.Mesh(panelGeometry, material);
-                item.position.set(randomX, 30, randomZ); 
+                item.position.set(randomX, 35, randomZ); 
                 item.quaternion.copy(camera.quaternion); 
                 scene.add(item);
 
@@ -160,7 +163,8 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    item.velocity += 0.025; 
+                    // ▼ 落下スピードを約2倍に速くしました（0.025 → 0.05）
+                    item.velocity += 0.05; 
                     item.mesh.position.y -= item.velocity;
                 } else {
                     item.mesh.position.y = item.landY; 
@@ -175,7 +179,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // 通信処理
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         let isFetching = false;
         let knownMissions = {}; 
@@ -195,7 +198,8 @@
                 document.getElementById('status').style.color = "#ff5252";
             } finally {
                 isFetching = false; 
-                setTimeout(fetchData, 1000); 
+                // ▼ 通信の待ち時間を「1秒」から「0.5秒」に短縮しました！
+                setTimeout(fetchData, 500); 
             }
         }
 
