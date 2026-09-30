@@ -79,29 +79,61 @@
         
         const panelGeometry = new THREE.PlaneGeometry(32.0, 18.0); 
 
+        // ==========================================
+        // 🌟 特殊演出の設定エリア 🌟
+        // ==========================================
+        // ① 指定した座標に【落下】させるファイル名と座標
+        const TARGET_DROP_FILE = "special_drop.png"; // スプレッドシートに入るファイル名の一部
+        const TARGET_DROP_X = 10.0;   // 横の位置（プラスで右、マイナスで左）
+        const TARGET_DROP_Z = -5.0;  // 奥行きの位置（プラスで手前、マイナスで奥）
+
+        // ② 指定した座標に【出現】（落ちずにパッと表示）させるファイル名と座標
+        const TARGET_APPEAR_FILE = "special_appear.mp4"; // 動画でも画像でもOK
+        const TARGET_APPEAR_X = -10.0; 
+        const TARGET_APPEAR_Z = -15.0;  
+        // ==========================================
+
         window.dropItem = function(imageName) {
             try {
-                let randomX, randomZ, landY;
+                let posX, posZ, landY;
                 let attempts = 0, isOverlapping = true;
                 
-                while (isOverlapping && attempts < 500) {
-                    // ▼ 修正①：特大アイテムが壁を突き抜けないように、横の落下範囲を狭めました（*50 → *35）
-                    randomX = (Math.random() - 0.5) * 35; 
-                    randomZ = (Math.random() * -30) + 5; 
-                    
-                    // ▼ 修正②：チラつき（Zファイティング）防止！
-                    // 後から落ちてきたものほど、ほんの数ミリだけ高く積み重なるようにしました
-                    landY = -6.0 + (fallingItems.length * 0.05); 
-                    
-                    isOverlapping = false;
-                    for (const item of fallingItems) {
-                        const dx = item.landX - randomX;
-                        const dz = item.landZ - randomZ;
-                        if (Math.sqrt(dx * dx + dz * dz) < 20.0) { 
-                            isOverlapping = true; break; 
-                        } 
+                // 特殊アイテムかどうかの判定
+                let isTargetDrop = false;
+                let isTargetAppear = false;
+
+                if (imageName && String(imageName).trim() !== "") {
+                    let checkName = String(imageName);
+                    if (TARGET_DROP_FILE !== "" && checkName.includes(TARGET_DROP_FILE)) {
+                        isTargetDrop = true;
+                    } else if (TARGET_APPEAR_FILE !== "" && checkName.includes(TARGET_APPEAR_FILE)) {
+                        isTargetAppear = true;
                     }
-                    attempts++;
+                }
+
+                if (isTargetDrop || isTargetAppear) {
+                    // 特殊アイテムの場合は座標を強制設定（重なり防止ループを無視）
+                    posX = isTargetDrop ? TARGET_DROP_X : TARGET_APPEAR_X;
+                    posZ = isTargetDrop ? TARGET_DROP_Z : TARGET_APPEAR_Z;
+                    // 他のアイテムより確実に上に表示されるよう少し高めに設定
+                    landY = -5.0 + (fallingItems.length * 0.05); 
+                } else {
+                    // いつものランダム落下処理
+                    while (isOverlapping && attempts < 500) {
+                        posX = (Math.random() - 0.5) * 35; 
+                        posZ = (Math.random() * -30) + 5; 
+                        landY = -6.0 + (fallingItems.length * 0.05); 
+                        
+                        isOverlapping = false;
+                        for (const item of fallingItems) {
+                            const dx = item.landX - posX;
+                            const dz = item.landZ - posZ;
+                            if (Math.sqrt(dx * dx + dz * dz) < 20.0) { 
+                                isOverlapping = true; break; 
+                            } 
+                        }
+                        attempts++;
+                    }
                 }
 
                 let material;
@@ -142,11 +174,18 @@
                 }
                 
                 const item = new THREE.Mesh(panelGeometry, material);
-                item.position.set(randomX, 35, randomZ); 
+                
+                // ▼ 出現か落下かで最初のスタート位置を変える
+                if (isTargetAppear) {
+                    item.position.set(posX, landY, posZ); // 最初から着地位置に置く
+                } else {
+                    item.position.set(posX, 35, posZ);    // 上空に置く（落下用）
+                }
+                
                 item.quaternion.copy(camera.quaternion); 
                 scene.add(item);
 
-                fallingItems.push({ mesh: item, velocity: 0, landX: randomX, landY: landY, landZ: randomZ });
+                fallingItems.push({ mesh: item, velocity: 0, landX: posX, landY: landY, landZ: posZ });
             } catch (err) {
                 console.error("落下エラー:", err);
             }
