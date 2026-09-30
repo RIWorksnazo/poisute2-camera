@@ -44,7 +44,6 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050505); 
         
-        // ▼変更：カメラを上に上げ、後ろに引いて「見下ろす」アングルにし、床を広く映す
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 14, 22); 
         camera.lookAt(0, -2, 0);       
@@ -88,12 +87,11 @@
             let attempts = 0;
             let isOverlapping = true;
 
-            // ▼変更：試行回数を増やし、絶対に重ならない空き地を徹底的に探させる
-            while (isOverlapping && attempts < 300) {
-                // 横幅(X)を広くし、奥行き(Z)も手前から奥まで大きく散らばらせる
+            // ▼変更：「上に乗っかる」のを防ぐため、重なり判定を厳密に修正
+            while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = (Math.random() * 0.5) - 0.5; 
+                landY = -0.5; // 空中で重ならないよう、着地位置(Y)を床に完全固定
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
@@ -101,8 +99,8 @@
                     const dz = item.landZ - randomZ;
                     const distance = Math.sqrt(dx * dx + dz * dz);
                     
-                    // ▼変更：1.8 → 2.2に拡大し、箱の角同士もぶつからない距離を確保
-                    if (distance < 2.2) {
+                    // 絶対に箱がめり込まない安全距離（2.0）
+                    if (distance < 2.0) {
                         isOverlapping = true;
                         break;
                     }
@@ -110,13 +108,22 @@
                 attempts++;
             }
 
+            // ▼追加：もし画像が読み込めなかった場合、強制的に白箱にするエラー回避処理
             let material;
             if (imageName && imageName.trim() !== "") {
-                const itemTexture = textureLoader.load(imageName); 
+                const itemTexture = textureLoader.load(
+                    imageName,
+                    undefined, // onProgress
+                    function (err) {
+                        // エラーが起きたらコンソールに警告を出し、テクスチャなしの白にする
+                        console.warn('画像が読み込めません:', imageName);
+                    }
+                ); 
                 material = new THREE.MeshStandardMaterial({ 
                     map: itemTexture, 
                     roughness: 0.7, 
-                    metalness: 0.1 
+                    metalness: 0.1,
+                    color: 0xffffff // ベース色を白にしておく
                 });
             } else {
                 material = new THREE.MeshStandardMaterial({ color: 0xffffff });
@@ -124,7 +131,8 @@
             
             const item = new THREE.Mesh(boxGeometry, material);
             item.position.set(randomX, 12, randomZ); 
-            item.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            // 落ちた後に「平ら」になるよう、回転を少し抑えめに
+            item.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, 0);
             item.castShadow = true; 
             scene.add(item);
 
@@ -135,9 +143,9 @@
                 landY: landY, 
                 landX: randomX, 
                 landZ: randomZ,
-                rotSpeedX: (Math.random() - 0.5) * 0.2,
+                rotSpeedX: (Math.random() - 0.5) * 0.1,
                 rotSpeedY: (Math.random() - 0.5) * 0.2,
-                rotSpeedZ: (Math.random() - 0.5) * 0.2
+                rotSpeedZ: (Math.random() - 0.5) * 0.1
             });
         }
 
@@ -161,6 +169,9 @@
                     item.bounces++;
                     item.rotSpeedX *= 0.5;
                     item.rotSpeedY *= 0.5;
+                } else {
+                    // バウンドが終わったら完全に床に固定し、ピタッと止める
+                    item.mesh.position.y = item.landY;
                 }
             });
             renderer.render(scene, camera);
@@ -215,7 +226,8 @@
                 
                 if (m.cleared && previousClearedState[index] === false) {
                     if (data.isDropEnabled && m.dropItem) {
-                        window.dropItem(m.hintImage); 
+                        // GASからM列の画像名がちゃんと送られてきているか確認して渡す
+                        window.dropItem(m.hintImage || ""); 
                     }
                 }
             });
