@@ -14,6 +14,7 @@
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
         .drop-status.off { color: #f44336; }
+        .debug-text { font-size: 12px; color: #00ff00; margin-top: 5px; opacity: 0.7; }
     </style>
     <script type="importmap">
         {
@@ -32,6 +33,8 @@
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
+            <!-- システムがチェックを検知したか確認できるログを追加 -->
+            <div id="monitor-log" class="debug-text">通信待機中...</div>
         </div>
     </div>
 
@@ -64,17 +67,17 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        const imageGeometry = new THREE.PlaneGeometry(4.0, 4.0); // 画像を少し大きめに
+        // ▼ 追加：ペラペラの平面をやめて、厚み（0.2）を持たせたパネル（Box）にしました！
+        const imageGeometry = new THREE.BoxGeometry(4.0, 4.0, 0.2); 
 
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0, isOverlapping = true;
 
-            // 落とす場所を決定
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = (Math.random() * 2) - 1.0; // 着地位置の高さに少しバラつきを持たせる
+                landY = (Math.random() * 2) - 1.0; 
                 isOverlapping = false;
                 for (const item of fallingItems) {
                     const dx = item.landX - randomX;
@@ -94,32 +97,24 @@
                 texture.colorSpace = THREE.SRGBColorSpace;
                 
                 material = new THREE.MeshStandardMaterial({ 
-                    map: texture, color: 0xffffff, roughness: 0.8, metalness: 0.1,
-                    side: THREE.DoubleSide, transparent: true
+                    map: texture, color: 0xffffff, roughness: 0.8, metalness: 0.1, transparent: true
                 });
             } else {
                 material = new THREE.MeshStandardMaterial({ 
-                    color: 0xffffff, roughness: 0.8, metalness: 0.1, side: THREE.DoubleSide 
+                    color: 0xffffff, roughness: 0.8, metalness: 0.1 
                 });
             }
             
             const item = new THREE.Mesh(imageGeometry, material);
-            // 最初から高い位置にセット
             item.position.set(randomX, 15, randomZ); 
             
-            // ▼ 変更：常にカメラの方向（正面）を向かせる！
-            item.lookAt(camera.position);
+            // 常にカメラの方向（真正面）を向かせる
+            item.quaternion.copy(camera.quaternion);
             
             item.castShadow = true; 
             scene.add(item);
 
-            fallingItems.push({ 
-                mesh: item, 
-                velocity: 0, 
-                landY: landY, 
-                landX: randomX, 
-                landZ: randomZ
-            });
+            fallingItems.push({ mesh: item, velocity: 0, landY: landY });
         }
 
         window.addEventListener('keydown', (e) => {
@@ -131,11 +126,9 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    // ▼ 変更：回転せず、スーッと加速しながら落ちる
-                    item.velocity += 0.015; // スピード調整
+                    item.velocity += 0.015; 
                     item.mesh.position.y -= item.velocity;
                 } else {
-                    // ▼ 変更：バウンドさせずに着地位置でピタッと止まる
                     item.mesh.position.y = item.landY;
                 }
             });
@@ -148,12 +141,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // ▼▼▼ 必ずご自身のGAS URLに書き換えてください！ ▼▼▼
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
         let droppedMissions = new Set();
-        let isFirstLoad = true; // 最初の読み込みかどうかを判定するフラグ
+        let isFirstLoad = true;
 
         async function fetchData() {
             if (isFetching) return; 
@@ -163,13 +155,6 @@
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
                 document.getElementById('status').innerText = "SYS: ONLINE 🟢";
-                
-                const dropIndicator = document.getElementById('drop-indicator');
-                if (data.isDropEnabled) {
-                    dropIndicator.innerText = "DROP: ON (ENABLED)"; dropIndicator.className = "drop-status";
-                } else {
-                    dropIndicator.innerText = "DROP: OFF (DISABLED)"; dropIndicator.className = "drop-status off";
-                }
             } catch (error) {
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
@@ -178,25 +163,30 @@
         }
 
         function updateUIAndCheckDrops(data) {
+            // ▼ 究極のバグ回避：GASが古いバージョンだった場合でも「落下ON」とみなして強制突破する
+            const masterDrop = (data.isDropEnabled !== false); 
+            let logText = "";
+
             data.missions.forEach((m, index) => {
                 const uniqueKey = m.name || `mission_${index}`;
                 
-                if (m.cleared && m.dropItem && data.isDropEnabled) {
-                    // 最初の読み込み時は「落下済み」として記録するだけで、落とさない
+                if (m.cleared && m.dropItem && masterDrop) {
                     if (isFirstLoad) {
                         droppedMissions.add(uniqueKey);
                     } 
-                    // 2回目以降の通信で、新しく条件を満たしたものだけを落とす
                     else if (!droppedMissions.has(uniqueKey)) {
+                        // ▼ Tキーの代わりに、システムが自動で落下指令を出す
                         window.dropItem(m.hintImage || ""); 
                         droppedMissions.add(uniqueKey); 
+                        logText = "落下を検知しました: " + uniqueKey;
                     }
                 } else {
-                    // どれか1つでも条件が外れたら、落下済みリストから消去（もう一度チェックを入れたら落ちる）
                     droppedMissions.delete(uniqueKey);
                 }
             });
-            // 最初の1周目のチェックが終わったら、フラグを折る
+            
+            // 右下の画面上に「検知したか」の文字が出るようにしました
+            if (logText) document.getElementById('monitor-log').innerText = logText;
             isFirstLoad = false;
         }
 
