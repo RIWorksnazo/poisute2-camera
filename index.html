@@ -80,7 +80,7 @@
         const fallingItems = [];
         
         // ▼ アイテムの縦横を2倍（16.0 x 9.0）の特大サイズに変更！
-        const panelGeometry = new THREE.PlaneGeometry(16.0, 9.0); 
+        const panelGeometry = new THREE.PlaneGeometry(32.0, 18.0); 
 
         window.dropItem = function(imageName) {
             try {
@@ -99,7 +99,7 @@
                         const dx = item.landX - randomX;
                         const dz = item.landZ - randomZ;
                         // ▼ 重なり判定もアイテムサイズに合わせて広げました（13.0）
-                        if (Math.sqrt(dx * dx + dz * dz) < 13.0) { 
+                        if (Math.sqrt(dx * dx + dz * dz) < 20.0) { 
                             isOverlapping = true; break; 
                         } 
                     }
