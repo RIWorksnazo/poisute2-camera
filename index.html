@@ -71,7 +71,6 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        // 厚み（0.2）を持たせたパネル
         const panelGeometry = new THREE.BoxGeometry(4.0, 4.0, 0.2); 
 
         window.dropItem = function(imageName) {
@@ -79,17 +78,15 @@
                 let randomX, randomZ, landY;
                 let attempts = 0, isOverlapping = true;
                 
-                // 【重ならないための計算】すでに落ちているパネルから「4.0」以上の距離を必ず取る
                 while (isOverlapping && attempts < 500) {
-                    randomX = (Math.random() - 0.5) * 26; // 横に散らす
-                    landY = (Math.random() - 0.5) * 12;   // 上下に散らす
-                    randomZ = (Math.random() * -5) - 1;   // 前後に散らしてめり込み防止
+                    randomX = (Math.random() - 0.5) * 26; 
+                    landY = (Math.random() - 0.5) * 12;   
+                    randomZ = (Math.random() * -5) - 1;   
                     
                     isOverlapping = false;
                     for (const item of fallingItems) {
                         const dx = item.landX - randomX;
                         const dy = item.landY - landY;
-                        // 距離が近すぎたらやり直し（重なり防止）
                         if (Math.sqrt(dx * dx + dy * dy) < 4.0) { 
                             isOverlapping = true; break; 
                         } 
@@ -115,12 +112,11 @@
                 }
                 
                 const item = new THREE.Mesh(panelGeometry, material);
-                item.position.set(randomX, 25, randomZ); // 画面の外（上）からスタート
-                item.quaternion.copy(camera.quaternion); // 常に真正面を向く
+                item.position.set(randomX, 25, randomZ); 
+                item.quaternion.copy(camera.quaternion); 
                 item.castShadow = true; 
                 scene.add(item);
 
-                // landX, landY, landZ をしっかり記憶させる（これがないと重なり防止が効きません！）
                 fallingItems.push({ mesh: item, velocity: 0, landX: randomX, landY: landY, landZ: randomZ });
             } catch (err) {
                 console.error("落下エラー:", err);
@@ -136,10 +132,10 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    item.velocity += 0.02; // スーッと落ちる
+                    item.velocity += 0.02; 
                     item.mesh.position.y -= item.velocity;
                 } else {
-                    item.mesh.position.y = item.landY; // 着地位置でピタッと止まる
+                    item.mesh.position.y = item.landY; 
                 }
             });
             renderer.render(scene, camera);
@@ -151,7 +147,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // 賢徳さんのGAS URL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
@@ -169,6 +164,10 @@
             } catch (error) {
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
+                // ▼ココです！！通信が終わったら必ずカギを開ける（これを忘れてました…）
+                isFetching = false; 
+                
+                // 1秒後にまた通信に行く
                 setTimeout(fetchData, 1000); 
             }
         }
@@ -179,7 +178,6 @@
 
             data.missions.forEach((m, index) => {
                 try {
-                    // エラー対策：ミッション名が数字や空欄でも絶対にフリーズさせない
                     const name = String(m.name || `mission_${index}`);
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
