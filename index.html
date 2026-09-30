@@ -52,7 +52,6 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // ▼ 動作を軽くするため、影の計算を完全にOFFにしました
         renderer.shadowMap.enabled = false;
         container.appendChild(renderer.domElement);
 
@@ -77,8 +76,9 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        // ▼ アイテムのサイズを約1.5倍（4.5 → 6.75）に大きくしました！
-        const panelGeometry = new THREE.PlaneGeometry(6.75, 6.75); 
+        
+        // ▼ 1920x1080 (16:9) に合わせて、横8.0 縦4.5 に変更しました！
+        const panelGeometry = new THREE.PlaneGeometry(8.0, 4.5); 
 
         window.dropItem = function(imageName) {
             try {
@@ -89,15 +89,14 @@
                     randomX = (Math.random() - 0.5) * 40; 
                     randomZ = (Math.random() * -30) + 10; 
                     
-                    // アイテムが大きくなった分、少し高めの位置で着地させます
                     landY = -6.0; 
                     
                     isOverlapping = false;
                     for (const item of fallingItems) {
                         const dx = item.landX - randomX;
                         const dz = item.landZ - randomZ;
-                        // ▼ 大きくなった分、重ならないための距離（4.5 → 6.8）も広げています
-                        if (Math.sqrt(dx * dx + dz * dz) < 6.8) { 
+                        // ▼ 横長になった分、重なり判定の距離を少しだけ広げました（6.8 → 8.5）
+                        if (Math.sqrt(dx * dx + dz * dz) < 8.5) { 
                             isOverlapping = true; break; 
                         } 
                     }
@@ -113,25 +112,22 @@
                     }
                     
                     let texture;
-                    // ▼ 拡張子が .mp4 だったら動画として処理する
                     if (url.toLowerCase().endsWith('.mp4')) {
                         const video = document.createElement('video');
                         video.src = url;
                         video.crossOrigin = 'anonymous';
-                        video.loop = true;  // 繰り返し再生
-                        video.muted = true; // 自動再生制限を回避するため音はミュート
+                        video.loop = true;  
+                        video.muted = true; 
                         video.playsInline = true;
                         video.play();
                         
                         texture = new THREE.VideoTexture(video);
                         texture.colorSpace = THREE.SRGBColorSpace;
                     } else {
-                        // ▼ それ以外は今まで通り画像として処理する
                         texture = textureLoader.load(url);
                         texture.colorSpace = THREE.SRGBColorSpace;
                     }
                     
-                    // MeshBasicMaterialを使うことで、光や影の影響を受けず「そのままの色と明るさ」で表示され、処理も激軽になります
                     material = new THREE.MeshBasicMaterial({ 
                         map: texture, 
                         transparent: true,
