@@ -46,17 +46,15 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        // ▼ アイテムが大きくなったので、カメラを少し後ろ（上）に引いて全体を見やすくしました
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 18, 42); 
         camera.lookAt(0, -5, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = false; // 影なし（軽量化）
+        renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        // ▼ 部屋（箱）もひと回り大きくしました
         const boxGeometry = new THREE.BoxGeometry(80, 50, 65);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
@@ -79,7 +77,6 @@
 
         const fallingItems = [];
         
-        // ▼ アイテムの縦横を2倍（16.0 x 9.0）の特大サイズに変更！
         const panelGeometry = new THREE.PlaneGeometry(32.0, 18.0); 
 
         window.dropItem = function(imageName) {
@@ -88,17 +85,18 @@
                 let attempts = 0, isOverlapping = true;
                 
                 while (isOverlapping && attempts < 500) {
-                    // アイテムが大きいので、散らばる範囲も広げました
-                    randomX = (Math.random() - 0.5) * 50; 
+                    // ▼ 修正①：特大アイテムが壁を突き抜けないように、横の落下範囲を狭めました（*50 → *35）
+                    randomX = (Math.random() - 0.5) * 35; 
                     randomZ = (Math.random() * -30) + 5; 
                     
-                    landY = -6.0; 
+                    // ▼ 修正②：チラつき（Zファイティング）防止！
+                    // 後から落ちてきたものほど、ほんの数ミリだけ高く積み重なるようにしました
+                    landY = -6.0 + (fallingItems.length * 0.05); 
                     
                     isOverlapping = false;
                     for (const item of fallingItems) {
                         const dx = item.landX - randomX;
                         const dz = item.landZ - randomZ;
-                        // ▼ 重なり判定もアイテムサイズに合わせて広げました（13.0）
                         if (Math.sqrt(dx * dx + dz * dz) < 20.0) { 
                             isOverlapping = true; break; 
                         } 
@@ -163,7 +161,6 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
-                    // ▼ 落下スピードを約2倍に速くしました（0.025 → 0.05）
                     item.velocity += 0.05; 
                     item.mesh.position.y -= item.velocity;
                 } else {
@@ -198,7 +195,6 @@
                 document.getElementById('status').style.color = "#ff5252";
             } finally {
                 isFetching = false; 
-                // ▼ 通信の待ち時間を「1秒」から「0.5秒」に短縮しました！
                 setTimeout(fetchData, 500); 
             }
         }
