@@ -44,9 +44,10 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050505); 
         
+        // ▼変更：カメラを上に上げ、後ろに引いて「見下ろす」アングルにし、床を広く映す
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 8, 15); 
-        camera.lookAt(0, 0, 0);       
+        camera.position.set(0, 14, 22); 
+        camera.lookAt(0, -2, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -87,18 +88,21 @@
             let attempts = 0;
             let isOverlapping = true;
 
-            while (isOverlapping && attempts < 50) {
-                // ▼ 変更：画面からはみ出さないちょうど良い広がり方に調整
-                randomX = (Math.random() - 0.5) * 14; // 横幅を縮小
-                randomZ = (Math.random() - 0.5) * 5;  // 奥行きを縮小
-                landY = (Math.random() * 1.5) - 0.5; 
+            // ▼変更：試行回数を増やし、絶対に重ならない空き地を徹底的に探させる
+            while (isOverlapping && attempts < 300) {
+                // 横幅(X)を広くし、奥行き(Z)も手前から奥まで大きく散らばらせる
+                randomX = (Math.random() - 0.5) * 20; 
+                randomZ = (Math.random() * -12) + 6;  
+                landY = (Math.random() * 0.5) - 0.5; 
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
                     const dx = item.landX - randomX;
                     const dz = item.landZ - randomZ;
                     const distance = Math.sqrt(dx * dx + dz * dz);
-                    if (distance < 1.8) {
+                    
+                    // ▼変更：1.8 → 2.2に拡大し、箱の角同士もぶつからない距離を確保
+                    if (distance < 2.2) {
                         isOverlapping = true;
                         break;
                     }
