@@ -88,9 +88,9 @@
             let isOverlapping = true;
 
             while (isOverlapping && attempts < 50) {
-                // ▼ 変更：横幅(X)と奥行き(Z)の散らばり範囲を画面いっぱいに広げました
-                randomX = (Math.random() - 0.5) * 24; 
-                randomZ = (Math.random() - 0.5) * 10; 
+                // ▼ 変更：画面からはみ出さないちょうど良い広がり方に調整
+                randomX = (Math.random() - 0.5) * 14; // 横幅を縮小
+                randomZ = (Math.random() - 0.5) * 5;  // 奥行きを縮小
                 landY = (Math.random() * 1.5) - 0.5; 
 
                 isOverlapping = false;
