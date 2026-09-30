@@ -111,10 +111,27 @@
                     if (!url.startsWith('http')) {
                         url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
                     }
-                    const texture = textureLoader.load(url);
-                    texture.colorSpace = THREE.SRGBColorSpace;
                     
-                    // ▼ MeshBasicMaterialを使うことで、光や影の影響を受けず「そのままの色と明るさ」で表示され、処理も激軽になります
+                    let texture;
+                    // ▼ 拡張子が .mp4 だったら動画として処理する
+                    if (url.toLowerCase().endsWith('.mp4')) {
+                        const video = document.createElement('video');
+                        video.src = url;
+                        video.crossOrigin = 'anonymous';
+                        video.loop = true;  // 繰り返し再生
+                        video.muted = true; // 自動再生制限を回避するため音はミュート
+                        video.playsInline = true;
+                        video.play();
+                        
+                        texture = new THREE.VideoTexture(video);
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                    } else {
+                        // ▼ それ以外は今まで通り画像として処理する
+                        texture = textureLoader.load(url);
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                    }
+                    
+                    // MeshBasicMaterialを使うことで、光や影の影響を受けず「そのままの色と明るさ」で表示され、処理も激軽になります
                     material = new THREE.MeshBasicMaterial({ 
                         map: texture, 
                         transparent: true,
