@@ -9,8 +9,11 @@
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-sizing: border-box; padding: 20px; z-index: 10; }
         .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
-        .rec-icon { color: red; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+        
+        /* ▼変更：点滅スピードをゆっくり(2s)に変更 */
+        .live-icon { color: red; animation: blink 2s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
         .drop-status.off { color: #f44336; }
@@ -27,7 +30,8 @@
 <body>
     <div id="canvas-container"></div>
     <div id="ui-layer">
-        <div class="cam-title"><span class="rec-icon">● LIVE</span></div>
+        <!-- ▼変更：REC を LIVE に変更 -->
+        <div class="cam-title"><span class="live-icon">● LIVE</span> CAM-01 : MAIN TRASH AREA</div>
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
             <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
@@ -37,6 +41,13 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // キーボードショートカット（Rキーでリロード）
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                location.reload();
+            }
+        });
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
@@ -48,7 +59,6 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // ▼追加：画質をくっきり綺麗にするための設定
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -90,7 +100,7 @@
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = 0.0; // 床面
+                landY = 0.0; 
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
@@ -108,7 +118,6 @@
             let material;
             if (imageName && imageName.trim() !== "") {
                 const texture = textureLoader.load(imageName, (tex) => {
-                    // ▼追加：画像のボヤけをなくし、最高画質（クッキリ）で表示する設定
                     tex.minFilter = THREE.LinearMipmapLinearFilter;
                     tex.magFilter = THREE.LinearFilter;
                     tex.generateMipmaps = true;
@@ -128,9 +137,8 @@
             const item = new THREE.Mesh(planeGeometry, material);
             item.position.set(randomX, 12, randomZ); 
             
-            // ▼変更：カメラの方向（手前）を向くように角度を調整（少しだけ斜めに倒して起き上がらせる）
-            item.rotation.x = -Math.PI / 6; // 手前に起こす
-            item.rotation.y = (Math.random() - 0.5) * 0.5; // 少しだけ左右に傾ける
+            item.rotation.x = -Math.PI / 6; 
+            item.rotation.y = (Math.random() - 0.5) * 0.5; 
             item.rotation.z = 0;
 
             scene.add(item);
