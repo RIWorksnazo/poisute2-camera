@@ -11,10 +11,17 @@
         .cam-title { position: absolute; top: 20px; left: 30px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 0 #000; }
         .rec-icon { color: red; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+        
+        /* ▼追加：画面左上のライブモニター */
+        #live-monitor {
+            position: absolute; top: 70px; left: 30px; font-size: 14px; color: rgba(255,255,255,0.9);
+            background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; line-height: 1.8;
+            max-height: 70vh; overflow: hidden;
+        }
+        
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; color: #888; text-align: right; line-height: 1.5; }
         .drop-status { font-weight: bold; color: #ffeb3b; }
-        .drop-status.off { color: #f44336; }
-        .debug-text { font-size: 12px; color: #00ff00; margin-top: 5px; opacity: 0.7; }
+        .debug-text { font-size: 14px; color: #00e676; margin-top: 5px; }
     </style>
     <script type="importmap">
         {
@@ -30,11 +37,12 @@
     <div id="ui-layer">
         <div class="cam-title"><span class="rec-icon">● REC</span> CAM-01 : MAIN TRASH AREA</div>
         
+        <!-- ここにスプレッドシートの状況がリアルタイムで映ります -->
+        <div id="live-monitor">通信を待機中...</div>
+        
         <div id="footer-info">
             <div id="status">SYS: STANDBY...</div>
-            <div id="drop-indicator" class="drop-status">DROP: CHECKING...</div>
-            <!-- システムがチェックを検知したか確認できるログを追加 -->
-            <div id="monitor-log" class="debug-text">通信待機中...</div>
+            <div id="monitor-log" class="debug-text">Tキーでテスト落下</div>
         </div>
     </div>
 
@@ -67,8 +75,9 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        // ▼ 追加：ペラペラの平面をやめて、厚み（0.2）を持たせたパネル（Box）にしました！
-        const imageGeometry = new THREE.BoxGeometry(4.0, 4.0, 0.2); 
+        
+        // ▼ 変更：厚み（0.2）のある立派なパネルボードを作ります
+        const panelGeometry = new THREE.BoxGeometry(4.0, 4.0, 0.2); 
 
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
@@ -88,6 +97,8 @@
             }
 
             let material;
+            const sideMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }); // 側面は白
+
             if (imageName && imageName.trim() !== "") {
                 let url = imageName.trim();
                 if (!url.startsWith('http')) {
@@ -96,19 +107,17 @@
                 const texture = textureLoader.load(url);
                 texture.colorSpace = THREE.SRGBColorSpace;
                 
-                material = new THREE.MeshStandardMaterial({ 
-                    map: texture, color: 0xffffff, roughness: 0.8, metalness: 0.1, transparent: true
-                });
+                const faceMaterial = new THREE.MeshStandardMaterial({ map: texture, color: 0xffffff, roughness: 0.8 });
+                // 箱の6面のうち、正面と裏面だけに画像を貼る（キャンバスボード風）
+                material = [sideMaterial, sideMaterial, sideMaterial, sideMaterial, faceMaterial, faceMaterial];
             } else {
-                material = new THREE.MeshStandardMaterial({ 
-                    color: 0xffffff, roughness: 0.8, metalness: 0.1 
-                });
+                material = sideMaterial; // 画像がない時は全部白
             }
             
-            const item = new THREE.Mesh(imageGeometry, material);
-            item.position.set(randomX, 15, randomZ); 
+            const item = new THREE.Mesh(panelGeometry, material);
+            item.position.set(randomX, 18, randomZ); 
             
-            // 常にカメラの方向（真正面）を向かせる
+            // ▼ 変更：常にカメラ（モニター）の方向を真正面に向かせる
             item.quaternion.copy(camera.quaternion);
             
             item.castShadow = true; 
@@ -126,6 +135,7 @@
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
                 if (item.mesh.position.y > item.landY) {
+                    // クルクル回らずに、スッと加速しながら落ちる
                     item.velocity += 0.015; 
                     item.mesh.position.y -= item.velocity;
                 } else {
@@ -141,10 +151,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // 賢徳さんのGAS URL
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
         
         let isFetching = false;
-        let droppedMissions = new Set();
+        let knownMissions = {}; // 前回通信した時のチェック状態を記憶する場所
         let isFirstLoad = true;
 
         async function fetchData() {
@@ -163,30 +174,35 @@
         }
 
         function updateUIAndCheckDrops(data) {
-            // ▼ 究極のバグ回避：GASが古いバージョンだった場合でも「落下ON」とみなして強制突破する
-            const masterDrop = (data.isDropEnabled !== false); 
+            let monitorHTML = "<b>▼ リアルタイム通信モニター ▼</b><br>";
             let logText = "";
 
             data.missions.forEach((m, index) => {
-                const uniqueKey = m.name || `mission_${index}`;
+                const name = m.name || `mission_${index}`;
+                // 文字列の "TRUE" も確実に true として扱う
+                const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
+
+                // 左上の画面に状況を表示
+                let statusText = isCleared ? '<span style="color:#00e676; font-weight:bold;">ON </span>' : '<span style="color:#ff5252;">OFF</span>';
+                monitorHTML += `[D列: ${statusText}] ${name.substring(0,10)}...<br>`;
                 
-                if (m.cleared && m.dropItem && masterDrop) {
-                    if (isFirstLoad) {
-                        droppedMissions.add(uniqueKey);
-                    } 
-                    else if (!droppedMissions.has(uniqueKey)) {
-                        // ▼ Tキーの代わりに、システムが自動で落下指令を出す
+                // ▼ここが究極にシンプルな落下判定！
+                // 「今はON」かつ「前回はOFF（または未記録）だった」なら落とす！
+                if (isCleared && !knownMissions[name]) {
+                    // ただし、画面を開いた瞬間に最初からONだったものは落とさない
+                    if (!isFirstLoad) {
                         window.dropItem(m.hintImage || ""); 
-                        droppedMissions.add(uniqueKey); 
-                        logText = "落下を検知しました: " + uniqueKey;
+                        logText = "落下を検知: " + name;
                     }
-                } else {
-                    droppedMissions.delete(uniqueKey);
                 }
+                
+                // 「今の状態」を記憶に上書きする（次にチェックが外れたらOFFとして記憶される）
+                knownMissions[name] = isCleared;
             });
             
-            // 右下の画面上に「検知したか」の文字が出るようにしました
+            document.getElementById('live-monitor').innerHTML = monitorHTML;
             if (logText) document.getElementById('monitor-log').innerText = logText;
+            
             isFirstLoad = false;
         }
 
