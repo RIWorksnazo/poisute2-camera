@@ -40,14 +40,13 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // Rキーで画面をリフレッシュし、溜まったゴミを消去する機能だけ残す
+        // Rキーで画面をリフレッシュし、溜まったゴミを消去する
         window.addEventListener('keydown', (e) => {
             if (e.key === 'r' || e.key === 'R') {
                 location.reload(); 
             }
         });
 
-        // 3Dシーンのセットアップ
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050505); 
@@ -79,9 +78,34 @@
         const fallingItems = [];
 
         function dropItem(imageName) {
-            const randomX = (Math.random() - 0.5) * 6;
-            const randomZ = (Math.random() - 0.5) * 2;
-            const landY = (Math.random() * 2) - 1; 
+            let randomX, randomZ, landY;
+            let attempts = 0;
+            let isOverlapping = true;
+
+            // ▼ 追加：既に落ちているゴミと位置が被らないように空き場所を探す
+            while (isOverlapping && attempts < 50) {
+                // ゴミ箱の範囲を少し広めに設定（-4 〜 +4）
+                randomX = (Math.random() - 0.5) * 8; 
+                // 奥行きも少し広めに（-1.5 〜 +1.5）
+                randomZ = (Math.random() - 0.5) * 3; 
+                landY = (Math.random() * 1.5) - 0.5; 
+
+                isOverlapping = false;
+                for (const item of fallingItems) {
+                    // 他のアイテムとの距離を計算
+                    const dx = item.landX - randomX;
+                    const dz = item.landZ - randomZ;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    
+                    // 距離が「1.8」以内なら重なっていると判定してやり直し
+                    // （数値を小さくすると重なりやすく、大きくするとより離れて落ちます）
+                    if (distance < 1.8) {
+                        isOverlapping = true;
+                        break;
+                    }
+                }
+                attempts++;
+            }
 
             let material;
             if (imageName && imageName.trim() !== "") {
@@ -96,7 +120,15 @@
             item.position.set(randomX, 12, randomZ); 
             scene.add(item);
 
-            fallingItems.push({ mesh: item, velocity: 0, bounces: 0, landY: landY });
+            // 落ちた位置を記憶しておく
+            fallingItems.push({ 
+                mesh: item, 
+                velocity: 0, 
+                bounces: 0, 
+                landY: landY, 
+                landX: randomX, 
+                landZ: randomZ 
+            });
         }
 
         function animate() {
