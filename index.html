@@ -48,6 +48,8 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // ▼追加：画質をくっきり綺麗にするための設定
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
@@ -78,10 +80,8 @@
         });
 
         const fallingItems = [];
-        // 平面のサイズ（幅・高さ）
-        const planeGeometry = new THREE.PlaneGeometry(2.0, 2.0);
+        const planeGeometry = new THREE.PlaneGeometry(2.2, 2.2);
 
-        // ゴミを落とする機能（通常の平面画像として落下）
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0;
@@ -90,7 +90,7 @@
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = -0.4; 
+                landY = 0.0; // 床面
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
@@ -105,10 +105,14 @@
                 attempts++;
             }
 
-            // 画像素材の適用（ない場合は白い板）
             let material;
             if (imageName && imageName.trim() !== "") {
-                const texture = textureLoader.load(imageName);
+                const texture = textureLoader.load(imageName, (tex) => {
+                    // ▼追加：画像のボヤけをなくし、最高画質（クッキリ）で表示する設定
+                    tex.minFilter = THREE.LinearMipmapLinearFilter;
+                    tex.magFilter = THREE.LinearFilter;
+                    tex.generateMipmaps = true;
+                });
                 material = new THREE.MeshBasicMaterial({ 
                     map: texture, 
                     side: THREE.DoubleSide,
@@ -123,9 +127,12 @@
             
             const item = new THREE.Mesh(planeGeometry, material);
             item.position.set(randomX, 12, randomZ); 
-            // 上から見た時にペタッと床に寝転がるように角度を調整
-            item.rotation.x = -Math.PI / 2;
-            item.rotation.z = Math.random() * Math.PI;
+            
+            // ▼変更：カメラの方向（手前）を向くように角度を調整（少しだけ斜めに倒して起き上がらせる）
+            item.rotation.x = -Math.PI / 6; // 手前に起こす
+            item.rotation.y = (Math.random() - 0.5) * 0.5; // 少しだけ左右に傾ける
+            item.rotation.z = 0;
+
             scene.add(item);
 
             fallingItems.push({ 
@@ -138,7 +145,6 @@
             });
         }
 
-        // アニメーションループ
         function animate() {
             requestAnimationFrame(animate);
             fallingItems.forEach(item => {
