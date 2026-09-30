@@ -87,19 +87,16 @@
             let attempts = 0;
             let isOverlapping = true;
 
-            // ▼変更：「上に乗っかる」のを防ぐため、重なり判定を厳密に修正
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = -0.5; // 空中で重ならないよう、着地位置(Y)を床に完全固定
+                landY = -0.5; 
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
                     const dx = item.landX - randomX;
                     const dz = item.landZ - randomZ;
                     const distance = Math.sqrt(dx * dx + dz * dz);
-                    
-                    // 絶対に箱がめり込まない安全距離（2.0）
                     if (distance < 2.0) {
                         isOverlapping = true;
                         break;
@@ -108,22 +105,16 @@
                 attempts++;
             }
 
-            // ▼追加：もし画像が読み込めなかった場合、強制的に白箱にするエラー回避処理
             let material;
             if (imageName && imageName.trim() !== "") {
-                const itemTexture = textureLoader.load(
-                    imageName,
-                    undefined, // onProgress
-                    function (err) {
-                        // エラーが起きたらコンソールに警告を出し、テクスチャなしの白にする
-                        console.warn('画像が読み込めません:', imageName);
-                    }
-                ); 
+                const itemTexture = textureLoader.load(imageName, undefined, function(err) {
+                    console.warn('画像エラー:', imageName);
+                }); 
                 material = new THREE.MeshStandardMaterial({ 
                     map: itemTexture, 
                     roughness: 0.7, 
                     metalness: 0.1,
-                    color: 0xffffff // ベース色を白にしておく
+                    color: 0xffffff
                 });
             } else {
                 material = new THREE.MeshStandardMaterial({ color: 0xffffff });
@@ -131,7 +122,6 @@
             
             const item = new THREE.Mesh(boxGeometry, material);
             item.position.set(randomX, 12, randomZ); 
-            // 落ちた後に「平ら」になるよう、回転を少し抑えめに
             item.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, 0);
             item.castShadow = true; 
             scene.add(item);
@@ -170,7 +160,6 @@
                     item.rotSpeedX *= 0.5;
                     item.rotSpeedY *= 0.5;
                 } else {
-                    // バウンドが終わったら完全に床に固定し、ピタッと止める
                     item.mesh.position.y = item.landY;
                 }
             });
@@ -193,7 +182,8 @@
             if (isFetching) return; 
             isFetching = true;
             try {
-                const response = await fetch(GAS_URL);
+                // ▼ここが最大の変更点！「?t=時間」をつけてブラウザのサボり（キャッシュ）を強制防止
+                const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
                 document.getElementById('status').innerText = "SYS: ONLINE 🟢";
@@ -224,9 +214,9 @@
                     isOColumnRecognized = true;
                 }
                 
-                if (m.cleared && previousClearedState[index] === false) {
+                // 「以前はOFFだった」かつ「今はONになった」瞬間に落下する
+                if (m.cleared === true && previousClearedState[index] === false) {
                     if (data.isDropEnabled && m.dropItem) {
-                        // GASからM列の画像名がちゃんと送られてきているか確認して渡す
                         window.dropItem(m.hintImage || ""); 
                     }
                 }
