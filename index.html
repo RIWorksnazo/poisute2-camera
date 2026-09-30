@@ -78,19 +78,19 @@
         });
 
         const fallingItems = [];
-        const boxGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+        // 平面のサイズ（幅・高さ）
+        const planeGeometry = new THREE.PlaneGeometry(2.0, 2.0);
 
-        // ゴミを落とす機能
+        // ゴミを落とする機能（通常の平面画像として落下）
         window.dropItem = function(imageName) {
             let randomX, randomZ, landY;
             let attempts = 0;
             let isOverlapping = true;
 
-            // 重ならないように空きスペースを探す
             while (isOverlapping && attempts < 500) {
                 randomX = (Math.random() - 0.5) * 20; 
                 randomZ = (Math.random() * -12) + 6;  
-                landY = -0.5; 
+                landY = -0.4; 
 
                 isOverlapping = false;
                 for (const item of fallingItems) {
@@ -105,27 +105,27 @@
                 attempts++;
             }
 
-            // 画像の読み込み処理（エラー時は白い箱になる）
-            const material = new THREE.MeshStandardMaterial({ 
-                color: 0xffffff, 
-                roughness: 0.7, 
-                metalness: 0.1 
-            });
-
+            // 画像素材の適用（ない場合は白い板）
+            let material;
             if (imageName && imageName.trim() !== "") {
-                textureLoader.load(
-                    imageName,
-                    function(texture) {
-                        material.map = texture;
-                        material.needsUpdate = true;
-                    }
-                );
+                const texture = textureLoader.load(imageName);
+                material = new THREE.MeshBasicMaterial({ 
+                    map: texture, 
+                    side: THREE.DoubleSide,
+                    transparent: true
+                });
+            } else {
+                material = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff, 
+                    side: THREE.DoubleSide 
+                });
             }
             
-            const item = new THREE.Mesh(boxGeometry, material);
+            const item = new THREE.Mesh(planeGeometry, material);
             item.position.set(randomX, 12, randomZ); 
-            item.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, 0);
-            item.castShadow = true; 
+            // 上から見た時にペタッと床に寝転がるように角度を調整
+            item.rotation.x = -Math.PI / 2;
+            item.rotation.z = Math.random() * Math.PI;
             scene.add(item);
 
             fallingItems.push({ 
@@ -134,10 +134,7 @@
                 bounces: 0, 
                 landY: landY, 
                 landX: randomX, 
-                landZ: randomZ,
-                rotSpeedX: (Math.random() - 0.5) * 0.1,
-                rotSpeedY: (Math.random() - 0.5) * 0.2,
-                rotSpeedZ: (Math.random() - 0.5) * 0.1
+                landZ: randomZ 
             });
         }
 
@@ -148,15 +145,10 @@
                 if (item.mesh.position.y > item.landY) {
                     item.velocity += 0.008; 
                     item.mesh.position.y -= item.velocity;
-                    item.mesh.rotation.x += item.rotSpeedX;
-                    item.mesh.rotation.y += item.rotSpeedY;
-                    item.mesh.rotation.z += item.rotSpeedZ;
                 } else if (item.bounces < 2) {
                     item.mesh.position.y = item.landY;
                     item.velocity = -item.velocity * 0.3; 
                     item.bounces++;
-                    item.rotSpeedX *= 0.5;
-                    item.rotSpeedY *= 0.5;
                 } else {
                     item.mesh.position.y = item.landY;
                 }
@@ -171,17 +163,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --------------------------------------------------------
-        // ▼ 変更が必要な場合はここだけ ▼
-        // 今使っているGASのURLを入れてください（変更がない場合はこのままでOK）
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
-        // --------------------------------------------------------
-        
         let previousClearedState = null; 
 
         async function fetchData() {
             try {
-                // キャッシュを完全に無視して最新データを強制取得
                 const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
                 
@@ -196,25 +182,21 @@
                     dropIndicator.className = "drop-status off";
                 }
 
-                // 画面を開いて最初の1回目の読み込みは状態を記録するだけ
                 if (previousClearedState === null) {
                     previousClearedState = data.missions.map(m => m.cleared);
                 } else {
-                    // 2回目以降の読み込みで「D列が新しくONになった」ものを探して落とす
                     data.missions.forEach((m, index) => {
                         if (m.cleared === true && previousClearedState[index] === false) {
                             if (data.isDropEnabled && m.dropItem) {
                                 window.dropItem(m.hintImage || ""); 
                             }
                         }
-                        // 状態を更新
                         previousClearedState[index] = m.cleared;
                     });
                 }
             } catch (error) {
                 document.getElementById('status').innerText = "SYS: ERROR 🔴";
             } finally {
-                // 1秒ごとにスプレッドシートを確認しに行く
                 setTimeout(fetchData, 1000); 
             }
         }
