@@ -35,7 +35,7 @@
         <div class="cam-title"><span class="live-icon">● LIVE</span></div>
         <div id="footer-info">
             <div id="status">SYS: STANDBY</div>
-            <div id="monitor-log" class="debug-text">SPACE: RETRY / C: CLEAR</div>
+            <div id="monitor-log" class="debug-text">SYS BOOT...</div>
         </div>
     </div>
 
@@ -62,7 +62,8 @@
             roughness: 0.9 
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
-        bigBox.position.set(0, 10, 0); 
+        
+        bigBox.position.set(0, 19, 0); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
@@ -99,10 +100,13 @@
                 let isTargetAppear = false;
 
                 if (imageName && String(imageName).trim() !== "") {
-                    let checkName = String(imageName);
-                    if (TARGET_DROP_FILE !== "" && checkName.includes(TARGET_DROP_FILE)) {
+                    let checkName = String(imageName).trim().toLowerCase();
+                    let targetDrop = TARGET_DROP_FILE.trim().toLowerCase();
+                    let targetAppear = TARGET_APPEAR_FILE.trim().toLowerCase();
+
+                    if (targetDrop !== "" && checkName.includes(targetDrop)) {
                         isTargetDrop = true;
-                    } else if (TARGET_APPEAR_FILE !== "" && checkName.includes(TARGET_APPEAR_FILE)) {
+                    } else if (targetAppear !== "" && checkName.includes(targetAppear)) {
                         isTargetAppear = true;
                     }
                 }
@@ -110,9 +114,8 @@
                 if (isTargetDrop || isTargetAppear) {
                     posX = isTargetDrop ? TARGET_DROP_X : TARGET_APPEAR_X;
                     posZ = isTargetDrop ? TARGET_DROP_Z : TARGET_APPEAR_Z;
-                    landY = -5.0 + (fallingItems.length * 0.05); 
+                    landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
-                    // ※フリーズ防止のため、attemptsを500→50に減らしました
                     while (isOverlapping && attempts < 50) {
                         posX = (Math.random() - 0.5) * 35; 
                         posZ = (Math.random() * -30) + 5; 
@@ -184,30 +187,25 @@
             }
         }
 
-        // ==========================================
-        // ⌨️ 本番用キーボード操作
-        // ==========================================
         window.addEventListener('keydown', (e) => {
-            // 【R】更新（復元）：ブラウザの更新と同じ。スプシにチェック済みのものは全て降ってきます
             if (e.key === 'r' || e.key === 'R') location.reload(); 
-            
-            // 【T】テスト落下：白いパネルを1枚落とします
             if (e.key === 't' || e.key === 'T') window.dropItem(""); 
-            
-            // 【C】完全リセット：公演ごとのリセット用。画面のアイテムを全部消します。
             if (e.key === 'c' || e.key === 'C') {
                 fallingItems.forEach(item => scene.remove(item.mesh));
                 fallingItems.length = 0;
-                knownMissions = {}; // 記憶もリセット
+                knownMissions = {}; 
                 document.getElementById('monitor-log').innerText = "SCREEN CLEARED";
             }
-            
-            // 【Space】手動再接続：エラーになった時、画面を消さずに通信だけ再開します
             if (e.key === ' ') {
                 if (!isFetching) {
+                    clearTimeout(fetchTimeout); 
                     document.getElementById('status').innerText = "SYS: RETRYING...";
                     document.getElementById('status').style.color = "#ffeb3b";
-                    fetchData();
+                    isFetching = true;
+                    setTimeout(() => {
+                        isFetching = false;
+                        fetchData();
+                    }, 800); 
                 }
             }
         });
@@ -235,10 +233,13 @@
         let isFetching = false;
         let knownMissions = {}; 
         let isFirstLoad = true;
+        let fetchTimeout; 
 
         async function fetchData() {
             if (isFetching) return; 
             isFetching = true;
+            clearTimeout(fetchTimeout);
+
             try {
                 const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
@@ -246,13 +247,13 @@
                 document.getElementById('status').innerText = "SYS: ONLINE";
                 document.getElementById('status').style.color = "#888";
             } catch (error) {
-                // エラー時は赤文字で表示。スペースキーで復帰可能。
-                document.getElementById('status').innerText = "SYS: ERROR (Press SPACE to retry)";
+                // ▼ 修正：世界観を崩さないよう、シンプルな文字に戻しました
+                document.getElementById('status').innerText = "SYS: ERROR";
                 document.getElementById('status').style.color = "#ff5252";
             } finally {
-                isFetching = false; 
-                // ▼ Googleに怒られないよう、2秒（2000）間隔に変更しました
-                setTimeout(fetchData, 2000); 
+                setTimeout(() => { isFetching = false; }, 500);
+                // ▼ 修正：通信間隔を2秒から「1秒(1000)」へ短縮して高速化！
+                fetchTimeout = setTimeout(fetchData, 1000); 
             }
         }
 
@@ -264,7 +265,6 @@
                     const name = String(m.name || m.hintImage || `mission_${index}`);
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
-                    // ▼ 修正！ロード時（更新時）にも、チェック済みのものは全てドロップさせます（消えない更新）
                     if (isCleared && !knownMissions[name]) {
                         window.dropItem(m.hintImage || ""); 
                         if (!isFirstLoad) {
