@@ -63,7 +63,8 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        bigBox.position.set(0, 19, 0); 
+        // ▼ 修正！斜めに傾いた画像の下半分が突き抜けないように、床の位置を微調整しました（19 → 14）
+        bigBox.position.set(0, 14, 0); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
@@ -204,7 +205,7 @@
                     isFetching = true;
                     setTimeout(() => {
                         isFetching = false;
-                        errorCount = 0; // 手動リトライ時にエラー回数リセット
+                        errorCount = 0; 
                         fetchData();
                     }, 800); 
                 }
@@ -236,7 +237,6 @@
         let isFirstLoad = true;
         let fetchTimeout; 
         
-        // ▼ 追加：連続エラー回数をカウントする変数
         let errorCount = 0;
 
         async function fetchData() {
@@ -251,13 +251,11 @@
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
                 
-                // 成功したらエラーカウントをリセットして通常表示
                 errorCount = 0;
                 document.getElementById('status').innerText = "SYS: ONLINE";
                 document.getElementById('status').style.color = "#888";
                 
             } catch (error) {
-                // ▼ 修正：すぐにはエラー表示せず、3回連続で失敗した時だけエラーを出す（サイレントリトライ）
                 errorCount++;
                 if (errorCount >= 3) {
                     document.getElementById('status').innerText = "SYS: ERROR";
@@ -265,7 +263,6 @@
                 }
             } finally {
                 setTimeout(() => { isFetching = false; }, 500);
-                // ▼ 修正：Googleに怒られないギリギリの絶妙なライン「1.5秒(1500)」に設定
                 fetchTimeout = setTimeout(fetchData, 1500); 
             }
         }
