@@ -55,7 +55,8 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        const boxGeometry = new THREE.BoxGeometry(80, 50, 65);
+        // ▼ 修正！部屋を横幅150、奥行き120の特大サイズに拡張しました
+        const boxGeometry = new THREE.BoxGeometry(150, 50, 120);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
             side: THREE.BackSide,  
@@ -63,8 +64,8 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        // ▼ 修正！斜めに傾いた画像の下半分が突き抜けないように、床の位置を微調整しました（19 → 14）
-        bigBox.position.set(0, 14, 0); 
+        // ▼ 修正！部屋の広さに合わせて、全体を少し奥にずらしました
+        bigBox.position.set(0, 14, -10); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
@@ -118,8 +119,9 @@
                     landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        posX = (Math.random() - 0.5) * 70; 
-                        posZ = (Math.random() * -45) + 10; 
+                        // ▼ 修正！壁に絶対めり込まない安全圏（横幅100、奥行き55の範囲）に限定して散らばらせます
+                        posX = (Math.random() - 0.5) * 100; 
+                        posZ = (Math.random() * -50) + 5; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
                         isOverlapping = false;
@@ -263,7 +265,7 @@
                 }
             } finally {
                 setTimeout(() => { isFetching = false; }, 500);
-                fetchTimeout = setTimeout(fetchData, 1000); 
+                fetchTimeout = setTimeout(fetchData, 1500); 
             }
         }
 
