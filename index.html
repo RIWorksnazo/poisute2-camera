@@ -64,7 +64,7 @@
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
         // ▼ 修正！斜めに傾いた画像の下半分が突き抜けないように、床の位置を微調整しました（19 → 14）
-        bigBox.position.set(0, 14, 0); 
+        bigBox.position.set(0, 17, 0); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
