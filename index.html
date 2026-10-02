@@ -35,7 +35,7 @@
         <div class="cam-title"><span class="live-icon">● LIVE</span></div>
         <div id="footer-info">
             <div id="status">SYS: STANDBY</div>
-            <div id="monitor-log" class="debug-text">SYS BOOT...</div>
+            <div id="monitor-log" class="debug-text"></div>
         </div>
     </div>
 
@@ -194,7 +194,7 @@
                 fallingItems.forEach(item => scene.remove(item.mesh));
                 fallingItems.length = 0;
                 knownMissions = {}; 
-                document.getElementById('monitor-log').innerText = "SCREEN CLEARED";
+                document.getElementById('monitor-log').innerText = "";
             }
             if (e.key === ' ') {
                 if (!isFetching) {
@@ -204,6 +204,7 @@
                     isFetching = true;
                     setTimeout(() => {
                         isFetching = false;
+                        errorCount = 0; // 手動リトライ時にエラー回数リセット
                         fetchData();
                     }, 800); 
                 }
@@ -234,6 +235,9 @@
         let knownMissions = {}; 
         let isFirstLoad = true;
         let fetchTimeout; 
+        
+        // ▼ 追加：連続エラー回数をカウントする変数
+        let errorCount = 0;
 
         async function fetchData() {
             if (isFetching) return; 
@@ -242,18 +246,27 @@
 
             try {
                 const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
+                if (!response.ok) throw new Error("Network response was not ok");
+                
                 const data = await response.json();
                 updateUIAndCheckDrops(data);
+                
+                // 成功したらエラーカウントをリセットして通常表示
+                errorCount = 0;
                 document.getElementById('status').innerText = "SYS: ONLINE";
                 document.getElementById('status').style.color = "#888";
+                
             } catch (error) {
-                // ▼ 修正：世界観を崩さないよう、シンプルな文字に戻しました
-                document.getElementById('status').innerText = "SYS: ERROR";
-                document.getElementById('status').style.color = "#ff5252";
+                // ▼ 修正：すぐにはエラー表示せず、3回連続で失敗した時だけエラーを出す（サイレントリトライ）
+                errorCount++;
+                if (errorCount >= 3) {
+                    document.getElementById('status').innerText = "SYS: ERROR";
+                    document.getElementById('status').style.color = "#ff5252";
+                }
             } finally {
                 setTimeout(() => { isFetching = false; }, 500);
-                // ▼ 修正：通信間隔を2秒から「1秒(1000)」へ短縮して高速化！
-                fetchTimeout = setTimeout(fetchData, 1000); 
+                // ▼ 修正：Googleに怒られないギリギリの絶妙なライン「1.5秒(1500)」に設定
+                fetchTimeout = setTimeout(fetchData, 1500); 
             }
         }
 
