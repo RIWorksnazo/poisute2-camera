@@ -46,7 +46,7 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 18, 42); 
         camera.lookAt(0, -5, 0);       
 
@@ -55,8 +55,7 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        // ▼ 修正！部屋を横幅150、奥行き120の特大サイズに拡張しました
-        const boxGeometry = new THREE.BoxGeometry(150, 50, 120);
+        const boxGeometry = new THREE.BoxGeometry(80, 50, 65);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
             side: THREE.BackSide,  
@@ -64,8 +63,8 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        // ▼ 修正！部屋の広さに合わせて、全体を少し奥にずらしました
-        bigBox.position.set(0, 14, -10); 
+        // ▼ 修正！斜めに傾いた画像の下半分が突き抜けないように、床の位置を微調整しました（19 → 14）
+        bigBox.position.set(0, 14, 0); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
@@ -119,9 +118,8 @@
                     landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        // ▼ 修正！壁に絶対めり込まない安全圏（横幅100、奥行き55の範囲）に限定して散らばらせます
-                        posX = (Math.random() - 0.5) * 100; 
-                        posZ = (Math.random() * -50) + 5; 
+                        posX = (Math.random() - 0.5) * 35; 
+                        posZ = (Math.random() * -30) + 5; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
                         isOverlapping = false;
