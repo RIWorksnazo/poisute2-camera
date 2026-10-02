@@ -35,7 +35,7 @@
         <div class="cam-title"><span class="live-icon">● LIVE</span></div>
         <div id="footer-info">
             <div id="status">SYS: STANDBY</div>
-            <div id="monitor-log" class="debug-text">T: DROP TEST</div>
+            <div id="monitor-log" class="debug-text">SPACE: RETRY / C: CLEAR</div>
         </div>
     </div>
 
@@ -76,19 +76,16 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        
         const panelGeometry = new THREE.PlaneGeometry(32.0, 18.0); 
 
         // ==========================================
         // 🌟 特殊演出の設定エリア 🌟
         // ==========================================
-        // ① 指定した座標に【落下】させるファイル名と座標
-        const TARGET_DROP_FILE = "special_drop.png"; // スプレッドシートに入るファイル名の一部
-        const TARGET_DROP_X = 10.0;   // 横の位置（プラスで右、マイナスで左）
-        const TARGET_DROP_Z = -5.0;  // 奥行きの位置（プラスで手前、マイナスで奥）
+        const TARGET_DROP_FILE = "special_drop.png"; 
+        const TARGET_DROP_X = 10.0;   
+        const TARGET_DROP_Z = -5.0;  
 
-        // ② 指定した座標に【出現】（落ちずにパッと表示）させるファイル名と座標
-        const TARGET_APPEAR_FILE = "special_appear.mp4"; // 動画でも画像でもOK
+        const TARGET_APPEAR_FILE = "special_appear.mp4"; 
         const TARGET_APPEAR_X = -10.0; 
         const TARGET_APPEAR_Z = -15.0;  
         // ==========================================
@@ -98,7 +95,6 @@
                 let posX, posZ, landY;
                 let attempts = 0, isOverlapping = true;
                 
-                // 特殊アイテムかどうかの判定
                 let isTargetDrop = false;
                 let isTargetAppear = false;
 
@@ -112,13 +108,11 @@
                 }
 
                 if (isTargetDrop || isTargetAppear) {
-                    // 特殊アイテムの場合は座標を強制設定（重なり防止ループを無視）
                     posX = isTargetDrop ? TARGET_DROP_X : TARGET_APPEAR_X;
                     posZ = isTargetDrop ? TARGET_DROP_Z : TARGET_APPEAR_Z;
-                    // 他のアイテムより確実に上に表示されるよう少し高めに設定
                     landY = -5.0 + (fallingItems.length * 0.05); 
                 } else {
-                    // いつものランダム落下処理
+                    // ※フリーズ防止のため、attemptsを500→50に減らしました
                     while (isOverlapping && attempts < 50) {
                         posX = (Math.random() - 0.5) * 35; 
                         posZ = (Math.random() * -30) + 5; 
@@ -175,11 +169,10 @@
                 
                 const item = new THREE.Mesh(panelGeometry, material);
                 
-                // ▼ 出現か落下かで最初のスタート位置を変える
                 if (isTargetAppear) {
-                    item.position.set(posX, landY, posZ); // 最初から着地位置に置く
+                    item.position.set(posX, landY, posZ); 
                 } else {
-                    item.position.set(posX, 35, posZ);    // 上空に置く（落下用）
+                    item.position.set(posX, 35, posZ);    
                 }
                 
                 item.quaternion.copy(camera.quaternion); 
@@ -191,9 +184,32 @@
             }
         }
 
+        // ==========================================
+        // ⌨️ 本番用キーボード操作
+        // ==========================================
         window.addEventListener('keydown', (e) => {
+            // 【R】更新（復元）：ブラウザの更新と同じ。スプシにチェック済みのものは全て降ってきます
             if (e.key === 'r' || e.key === 'R') location.reload(); 
+            
+            // 【T】テスト落下：白いパネルを1枚落とします
             if (e.key === 't' || e.key === 'T') window.dropItem(""); 
+            
+            // 【C】完全リセット：公演ごとのリセット用。画面のアイテムを全部消します。
+            if (e.key === 'c' || e.key === 'C') {
+                fallingItems.forEach(item => scene.remove(item.mesh));
+                fallingItems.length = 0;
+                knownMissions = {}; // 記憶もリセット
+                document.getElementById('monitor-log').innerText = "SCREEN CLEARED";
+            }
+            
+            // 【Space】手動再接続：エラーになった時、画面を消さずに通信だけ再開します
+            if (e.key === ' ') {
+                if (!isFetching) {
+                    document.getElementById('status').innerText = "SYS: RETRYING...";
+                    document.getElementById('status').style.color = "#ffeb3b";
+                    fetchData();
+                }
+            }
         });
 
         function animate() {
@@ -230,11 +246,13 @@
                 document.getElementById('status').innerText = "SYS: ONLINE";
                 document.getElementById('status').style.color = "#888";
             } catch (error) {
-                document.getElementById('status').innerText = "SYS: ERROR";
+                // エラー時は赤文字で表示。スペースキーで復帰可能。
+                document.getElementById('status').innerText = "SYS: ERROR (Press SPACE to retry)";
                 document.getElementById('status').style.color = "#ff5252";
             } finally {
                 isFetching = false; 
-                setTimeout(fetchData, 500); 
+                // ▼ Googleに怒られないよう、2秒（2000）間隔に変更しました
+                setTimeout(fetchData, 2000); 
             }
         }
 
@@ -246,9 +264,10 @@
                     const name = String(m.name || m.hintImage || `mission_${index}`);
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
+                    // ▼ 修正！ロード時（更新時）にも、チェック済みのものは全てドロップさせます（消えない更新）
                     if (isCleared && !knownMissions[name]) {
+                        window.dropItem(m.hintImage || ""); 
                         if (!isFirstLoad) {
-                            window.dropItem(m.hintImage || ""); 
                             logText = "DROP: " + String(m.name || "ITEM").substring(0,6);
                         }
                     }
@@ -261,7 +280,7 @@
                 const logEl = document.getElementById('monitor-log');
                 logEl.innerText = logText;
                 logEl.style.color = "#fff";
-                setTimeout(() => { logEl.style.color = "#00e676"; }, 1000);
+                setTimeout(() => { logEl.style.color = "#00e676"; }, 500);
             }
             
             isFirstLoad = false;
