@@ -119,7 +119,7 @@
                     landY = -5.0 + (fallingItems.length * 0.05); 
                 } else {
                     // いつものランダム落下処理
-                    while (isOverlapping && attempts < 500) {
+                    while (isOverlapping && attempts < 50) {
                         posX = (Math.random() - 0.5) * 35; 
                         posZ = (Math.random() * -30) + 5; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
@@ -261,7 +261,7 @@
                 const logEl = document.getElementById('monitor-log');
                 logEl.innerText = logText;
                 logEl.style.color = "#fff";
-                setTimeout(() => { logEl.style.color = "#00e676"; }, 500);
+                setTimeout(() => { logEl.style.color = "#00e676"; }, 1000);
             }
             
             isFirstLoad = false;
