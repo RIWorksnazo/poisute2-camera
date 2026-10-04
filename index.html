@@ -46,9 +46,9 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        // ▼ 修正：画角を40度に狭め、自然なズーム感に調整
-        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 22, 50); 
+        // ▼ 修正：画角は自然な42度に保ちつつ、カメラを少し後ろに引きました
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 24, 55); 
         camera.lookAt(0, -5, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -56,7 +56,8 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        const boxGeometry = new THREE.BoxGeometry(140, 60, 100);
+        // ▼ 修正：箱自体を小さく（100x45x75）して、相対的にアイテムが大きく見えるようにしました
+        const boxGeometry = new THREE.BoxGeometry(100, 45, 75);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
             side: THREE.BackSide,  
@@ -64,7 +65,7 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        bigBox.position.set(0, 16, -10); 
+        bigBox.position.set(0, 12, -10); 
         scene.add(bigBox);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
@@ -117,11 +118,11 @@
                 if (isTargetDrop || isTargetAppear) {
                     posX = isTargetDrop ? TARGET_DROP_X : TARGET_APPEAR_X;
                     posZ = isTargetDrop ? TARGET_DROP_Z : TARGET_APPEAR_Z;
-                    landY = -5.9 + (fallingItems.length * 0.05); 
+                    landY = -6.0 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        // ▼ 修正：横幅のはみ出しをなくすため、散らばる幅を65にギュッと狭めました
-                        posX = (Math.random() - 0.5) * 65; 
+                        // ▼ 修正：小さくした箱に合わせて、はみ出ない散らばり幅（60）に調整
+                        posX = (Math.random() - 0.5) * 60; 
                         posZ = (Math.random() * -30) + 10; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
@@ -129,7 +130,7 @@
                         for (const item of fallingItems) {
                             const dx = item.landX - posX;
                             const dz = item.landZ - posZ;
-                            if (Math.sqrt(dx * dx + dz * dz) < 20.0) { 
+                            if (Math.sqrt(dx * dx + dz * dz) < 24.0) { 
                                 isOverlapping = true; break; 
                             } 
                         }
@@ -161,12 +162,13 @@
                         transparent: true,
                         side: THREE.DoubleSide
                     });
-                    item.scale.set(32.0, 18.0, 1); 
+                    item.scale.set(36.0, 20.25, 1); 
                 } else {
                     let texture = textureLoader.load(url, (tex) => {
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
-                        const maxSize = 20.0; 
+                        // ▼ 修正：アイテム自体の基準サイズも少し大きく（24.0）しました
+                        const maxSize = 24.0; 
                         
                         let scaleX, scaleY;
                         if (imgW > imgH) {
