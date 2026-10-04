@@ -63,7 +63,7 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        // 浮き対策で床の高さを少し上げています
+        // 浮き対策の床の高さ調整
         bigBox.position.set(0, 16, -10); 
         scene.add(bigBox);
 
@@ -78,7 +78,9 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        const panelGeometry = new THREE.PlaneGeometry(32.0, 18.0); 
+        
+        // ▼ 修正！最初は1x1の正方形で作っておき、画像に合わせて後からサイズを変えます
+        const panelGeometry = new THREE.PlaneGeometry(1.0, 1.0); 
 
         // ==========================================
         // 🌟 特殊演出の設定エリア 🌟
@@ -94,7 +96,7 @@
 
         window.dropItem = function(imageName) {
             try {
-                // ▼ 空っぽの時は絶対に落とさずにストップする処理 ▼
+                // 空っぽの時は絶対に落とさずにストップする処理
                 if (!imageName || String(imageName).trim() === "") {
                     return; 
                 }
@@ -142,7 +144,9 @@
                     url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
                 }
                 
-                let texture;
+                // メッシュを先に作っておく
+                const item = new THREE.Mesh(panelGeometry);
+
                 if (url.toLowerCase().endsWith('.mp4')) {
                     const video = document.createElement('video');
                     video.src = url;
@@ -152,20 +156,41 @@
                     video.playsInline = true;
                     video.play();
                     
-                    texture = new THREE.VideoTexture(video);
+                    let texture = new THREE.VideoTexture(video);
                     texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    item.material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        transparent: true,
+                        side: THREE.DoubleSide
+                    });
+                    item.scale.set(32.0, 18.0, 1); // 動画は16:9で固定
                 } else {
-                    texture = textureLoader.load(url);
+                    let texture = textureLoader.load(url, (tex) => {
+                        // ▼ ここがプロポーション修正のキモ！画像本来の縦横比を取得してサイズ調整
+                        const imgW = tex.image.width || 1;
+                        const imgH = tex.image.height || 1;
+                        const maxSize = 25.0; // アイテムの最大サイズ基準
+                        
+                        let scaleX, scaleY;
+                        if (imgW > imgH) {
+                            scaleX = maxSize;
+                            scaleY = maxSize * (imgH / imgW);
+                        } else {
+                            scaleY = maxSize;
+                            scaleX = maxSize * (imgW / imgH);
+                        }
+                        item.scale.set(scaleX, scaleY, 1);
+                    });
                     texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    item.material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        transparent: true,
+                        side: THREE.DoubleSide
+                    });
+                    item.scale.set(0.001, 0.001, 1); // 画像が読み込まれるまでは見えないサイズにしておく
                 }
-                
-                let material = new THREE.MeshBasicMaterial({ 
-                    map: texture, 
-                    transparent: true,
-                    side: THREE.DoubleSide
-                });
-                
-                const item = new THREE.Mesh(panelGeometry, material);
                 
                 if (isTargetAppear) {
                     item.position.set(posX, landY, posZ); 
