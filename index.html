@@ -78,8 +78,6 @@
         textureLoader.setCrossOrigin('anonymous');
 
         const fallingItems = [];
-        
-        // ▼ 修正！最初は1x1の正方形で作っておき、画像に合わせて後からサイズを変えます
         const panelGeometry = new THREE.PlaneGeometry(1.0, 1.0); 
 
         // ==========================================
@@ -96,7 +94,7 @@
 
         window.dropItem = function(imageName) {
             try {
-                // 空っぽの時は絶対に落とさずにストップする処理
+                // 空欄ストッパー
                 if (!imageName || String(imageName).trim() === "") {
                     return; 
                 }
@@ -144,7 +142,6 @@
                     url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
                 }
                 
-                // メッシュを先に作っておく
                 const item = new THREE.Mesh(panelGeometry);
 
                 if (url.toLowerCase().endsWith('.mp4')) {
@@ -164,13 +161,13 @@
                         transparent: true,
                         side: THREE.DoubleSide
                     });
-                    item.scale.set(32.0, 18.0, 1); // 動画は16:9で固定
+                    item.scale.set(32.0, 18.0, 1); 
                 } else {
                     let texture = textureLoader.load(url, (tex) => {
-                        // ▼ ここがプロポーション修正のキモ！画像本来の縦横比を取得してサイズ調整
+                        // プロポーション修正
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
-                        const maxSize = 25.0; // アイテムの最大サイズ基準
+                        const maxSize = 25.0; 
                         
                         let scaleX, scaleY;
                         if (imgW > imgH) {
@@ -189,7 +186,7 @@
                         transparent: true,
                         side: THREE.DoubleSide
                     });
-                    item.scale.set(0.001, 0.001, 1); // 画像が読み込まれるまでは見えないサイズにしておく
+                    item.scale.set(0.001, 0.001, 1); 
                 }
                 
                 if (isTargetAppear) {
@@ -290,16 +287,17 @@
 
             data.missions.forEach((m, index) => {
                 try {
-                    const name = String(m.name || m.hintImage || `mission_${index}`);
+                    // 連打バグ修正：行番号で判別
+                    const uniqueKey = "mission_row_" + index;
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
-                    if (isCleared && !knownMissions[name]) {
+                    if (isCleared && !knownMissions[uniqueKey]) {
                         window.dropItem(m.hintImage || ""); 
                         if (!isFirstLoad) {
                             logText = "DROP: " + String(m.name || "ITEM").substring(0,6);
                         }
                     }
-                    knownMissions[name] = isCleared;
+                    knownMissions[uniqueKey] = isCleared;
                 } catch (err) {
                 }
             });
