@@ -46,9 +46,9 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        // ▼ 修正：画角を50度に戻し、カメラを「少し上＆後ろ」に下げて部屋全体を映すようにしました
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 25, 55); 
+        // ▼ 修正：画角を40度に狭め、自然なズーム感に調整
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 22, 50); 
         camera.lookAt(0, -5, 0);       
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -56,7 +56,6 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        // ▼ 修正：カメラが引いた分、背景の部屋も少し大きくして余白を作りました
         const boxGeometry = new THREE.BoxGeometry(140, 60, 100);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
@@ -121,9 +120,9 @@
                     landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        // ▼ 修正：画面内に綺麗に収まり、壁にもめり込まない絶妙な散らばり範囲
-                        posX = (Math.random() - 0.5) * 100; 
-                        posZ = (Math.random() * -35) + 10; 
+                        // ▼ 修正：横幅のはみ出しをなくすため、散らばる幅を65にギュッと狭めました
+                        posX = (Math.random() - 0.5) * 65; 
+                        posZ = (Math.random() * -30) + 10; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
                         isOverlapping = false;
