@@ -46,7 +46,7 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        // ▼ 修正：画角を35度にして、自然な視野に調整しました
+        // ▼ 画角35度で、監視カメラらしい自然なズーム感
         const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 18, 42); 
         camera.lookAt(0, -5, 0);       
@@ -56,7 +56,8 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        const boxGeometry = new THREE.BoxGeometry(150, 50, 120);
+        // ▼ 修正：画角35度にピッタリ映るように「立体の部屋」のサイズを最適化（壁の角がちゃんと見えます）
+        const boxGeometry = new THREE.BoxGeometry(110, 50, 80);
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0xcccccc,       
             side: THREE.BackSide,  
@@ -64,7 +65,6 @@
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
-        // 浮き対策の床の高さ調整
         bigBox.position.set(0, 16, -10); 
         scene.add(bigBox);
 
@@ -95,7 +95,6 @@
 
         window.dropItem = function(imageName) {
             try {
-                // 空欄ストッパー
                 if (!imageName || String(imageName).trim() === "") {
                     return; 
                 }
@@ -122,9 +121,9 @@
                     landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        // ▼ 修正：画角35度にピッタリ収まり、画面から見切れない幅(55)と奥行きに同期させました
-                        posX = (Math.random() - 0.5) * 55; 
-                        posZ = (Math.random() * -40) + 5; 
+                        // ▼ 修正：部屋の壁（幅110、奥行き80）に対して、アイテムの横幅分を引いた「絶対に壁からはみ出ない安全圏」の立体座標
+                        posX = (Math.random() - 0.5) * 80; // 横幅-40〜+40（壁は±55）
+                        posZ = (Math.random() * -30) + 10; // 奥-20〜手前+10（壁は奥-50）
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
                         isOverlapping = false;
@@ -166,10 +165,9 @@
                     item.scale.set(32.0, 18.0, 1); 
                 } else {
                     let texture = textureLoader.load(url, (tex) => {
-                        // プロポーション修正
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
-                        const maxSize = 20.0; // 画面に収まるよう少し最大サイズを調整しました
+                        const maxSize = 20.0; 
                         
                         let scaleX, scaleY;
                         if (imgW > imgH) {
@@ -289,7 +287,6 @@
 
             data.missions.forEach((m, index) => {
                 try {
-                    // 連打バグ修正：行番号で判別
                     const uniqueKey = "mission_row_" + index;
                     const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
 
