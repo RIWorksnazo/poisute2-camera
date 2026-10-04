@@ -46,7 +46,8 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111); 
         
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // ▼ 修正：画角を35度にして、自然な視野に調整しました
+        const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 18, 42); 
         camera.lookAt(0, -5, 0);       
 
@@ -121,8 +122,9 @@
                     landY = -5.9 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        posX = (Math.random() - 0.5) * 100; 
-                        posZ = (Math.random() * -50) + 5; 
+                        // ▼ 修正：画角35度にピッタリ収まり、画面から見切れない幅(55)と奥行きに同期させました
+                        posX = (Math.random() - 0.5) * 55; 
+                        posZ = (Math.random() * -40) + 5; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
                         isOverlapping = false;
@@ -167,7 +169,7 @@
                         // プロポーション修正
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
-                        const maxSize = 25.0; 
+                        const maxSize = 20.0; // 画面に収まるよう少し最大サイズを調整しました
                         
                         let scaleX, scaleY;
                         if (imgW > imgH) {
