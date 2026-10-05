@@ -44,9 +44,9 @@
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x111111); 
+        // ▼ 修正：シーンの背景を真っ黒に
+        scene.background = new THREE.Color(0x000000); 
         
-        // ▼ 修正：画角は自然な42度に保ちつつ、カメラを少し後ろに引きました
         const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 24, 55); 
         camera.lookAt(0, -5, 0);       
@@ -56,10 +56,10 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
-        // ▼ 修正：箱自体を小さく（100x45x75）して、相対的にアイテムが大きく見えるようにしました
         const boxGeometry = new THREE.BoxGeometry(100, 45, 75);
+        // ▼ 修正：部屋（箱）の色を真っ黒に
         const boxMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xcccccc,       
+            color: 0x000000,       
             side: THREE.BackSide,  
             roughness: 0.9 
         });
@@ -121,7 +121,6 @@
                     landY = -6.0 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        // ▼ 修正：小さくした箱に合わせて、はみ出ない散らばり幅（60）に調整
                         posX = (Math.random() - 0.5) * 60; 
                         posZ = (Math.random() * -30) + 10; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
@@ -167,7 +166,6 @@
                     let texture = textureLoader.load(url, (tex) => {
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
-                        // ▼ 修正：アイテム自体の基準サイズも少し大きく（24.0）しました
                         const maxSize = 24.0; 
                         
                         let scaleX, scaleY;
