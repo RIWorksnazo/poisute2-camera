@@ -44,9 +44,10 @@
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        // ▼ 修正：シーンの背景を真っ黒に
+        // 背景は真っ黒
         scene.background = new THREE.Color(0x000000); 
         
+        // 画角42度、カメラ位置はそのまま[cite: 10]
         const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 24, 55); 
         camera.lookAt(0, -5, 0);       
@@ -56,8 +57,8 @@
         renderer.shadowMap.enabled = false; 
         container.appendChild(renderer.domElement);
 
+        // 部屋の箱（100x45x75）も真っ黒
         const boxGeometry = new THREE.BoxGeometry(100, 45, 75);
-        // ▼ 修正：部屋（箱）の色を真っ黒に
         const boxMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x000000,       
             side: THREE.BackSide,  
@@ -121,7 +122,9 @@
                     landY = -6.0 + (fallingItems.length * 0.05); 
                 } else {
                     while (isOverlapping && attempts < 50) {
-                        posX = (Math.random() - 0.5) * 60; 
+                        // ▼ 修正：散らばり幅を「もう少し広く」の幅72（±36）に広げました[cite: 10]
+                        // 壁の端(±50)からアイテム最大半径(12)を引いた安全端(±38)の内側です[cite: 10]。
+                        posX = (Math.random() - 0.5) * 72; 
                         posZ = (Math.random() * -30) + 10; 
                         landY = -6.0 + (fallingItems.length * 0.05); 
                         
@@ -129,6 +132,7 @@
                         for (const item of fallingItems) {
                             const dx = item.landX - posX;
                             const dz = item.landZ - posZ;
+                            // 重なり判定距離（最大直径24を基準）
                             if (Math.sqrt(dx * dx + dz * dz) < 24.0) { 
                                 isOverlapping = true; break; 
                             } 
@@ -166,6 +170,7 @@
                     let texture = textureLoader.load(url, (tex) => {
                         const imgW = tex.image.width || 1;
                         const imgH = tex.image.height || 1;
+                        // アイテム基準サイズは24.0[cite: 10]
                         const maxSize = 24.0; 
                         
                         let scaleX, scaleY;
@@ -259,7 +264,7 @@
             clearTimeout(fetchTimeout);
 
             try {
-                const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
+                const response = fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 if (!response.ok) throw new Error("Network response was not ok");
                 
                 const data = await response.json();
