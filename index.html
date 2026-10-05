@@ -93,4 +93,223 @@
 
         window.dropItem = function(imageName) {
             try {
-                if (!imageName || String(imageName).trim()
+                if (!imageName || String(imageName).trim() === "") {
+                    return; 
+                }
+                
+                let posX, posZ, landY;
+                let attempts = 0, isOverlapping = true;
+                
+                let isTargetDrop = false;
+                let isTargetAppear = false;
+
+                let checkName = String(imageName).trim().toLowerCase();
+                let targetDrop = TARGET_DROP_FILE.trim().toLowerCase();
+                let targetAppear = TARGET_APPEAR_FILE.trim().toLowerCase();
+
+                if (targetDrop !== "" && checkName.includes(targetDrop)) {
+                    isTargetDrop = true;
+                } else if (targetAppear !== "" && checkName.includes(targetAppear)) {
+                    isTargetAppear = true;
+                }
+
+                if (isTargetDrop || isTargetAppear) {
+                    posX = isTargetDrop ? TARGET_DROP_X : TARGET_APPEAR_X;
+                    posZ = isTargetDrop ? TARGET_DROP_Z : TARGET_APPEAR_Z;
+                    landY = -6.0 + (fallingItems.length * 0.05); 
+                } else {
+                    while (isOverlapping && attempts < 50) {
+                        posX = (Math.random() - 0.5) * 72; 
+                        posZ = (Math.random() * -30) + 10; 
+                        landY = -6.0 + (fallingItems.length * 0.05); 
+                        
+                        isOverlapping = false;
+                        for (const item of fallingItems) {
+                            const dx = item.landX - posX;
+                            const dz = item.landZ - posZ;
+                            if (Math.sqrt(dx * dx + dz * dz) < 24.0) { 
+                                isOverlapping = true; break; 
+                            } 
+                        }
+                        attempts++;
+                    }
+                }
+
+                let url = String(imageName).trim();
+                if (!url.startsWith('http')) {
+                    url = 'https://riworksnazo.github.io/poisute2-camera/' + url;
+                }
+                
+                const item = new THREE.Mesh(panelGeometry);
+
+                if (url.toLowerCase().endsWith('.mp4')) {
+                    const video = document.createElement('video');
+                    video.src = url;
+                    video.crossOrigin = 'anonymous';
+                    video.loop = true;  
+                    video.muted = true; 
+                    video.playsInline = true;
+                    video.play();
+                    
+                    let texture = new THREE.VideoTexture(video);
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    item.material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        transparent: true,
+                        side: THREE.DoubleSide
+                    });
+                    item.scale.set(36.0, 20.25, 1); 
+                } else {
+                    let texture = textureLoader.load(url, (tex) => {
+                        const imgW = tex.image.width || 1;
+                        const imgH = tex.image.height || 1;
+                        const maxSize = 24.0; 
+                        
+                        let scaleX, scaleY;
+                        if (imgW > imgH) {
+                            scaleX = maxSize;
+                            scaleY = maxSize * (imgH / imgW);
+                        } else {
+                            scaleY = maxSize;
+                            scaleX = maxSize * (imgW / imgH);
+                        }
+                        item.scale.set(scaleX, scaleY, 1);
+                    });
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    item.material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        transparent: true,
+                        side: THREE.DoubleSide
+                    });
+                    item.scale.set(0.001, 0.001, 1); 
+                }
+                
+                if (isTargetAppear) {
+                    item.position.set(posX, landY, posZ); 
+                } else {
+                    item.position.set(posX, 35, posZ);    
+                }
+                
+                item.quaternion.copy(camera.quaternion); 
+                scene.add(item);
+
+                fallingItems.push({ mesh: item, velocity: 0, landX: posX, landY: landY, landZ: posZ });
+            } catch (err) {
+                console.error("落下エラー:", err);
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') location.reload(); 
+            if (e.key === 'c' || e.key === 'C') {
+                fallingItems.forEach(item => scene.remove(item.mesh));
+                fallingItems.length = 0;
+                knownMissions = {}; 
+                document.getElementById('monitor-log').innerText = "";
+            }
+            if (e.key === ' ') {
+                if (!isFetching) {
+                    clearTimeout(fetchTimeout); 
+                    document.getElementById('status').innerText = "SYS: RETRYING...";
+                    document.getElementById('status').style.color = "#ffeb3b";
+                    isFetching = true;
+                    setTimeout(() => {
+                        isFetching = false;
+                        errorCount = 0; 
+                        fetchData();
+                    }, 800); 
+                }
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            fallingItems.forEach(item => {
+                if (item.mesh.position.y > item.landY) {
+                    item.velocity += 0.05; 
+                    item.mesh.position.y -= item.velocity;
+                } else {
+                    item.mesh.position.y = item.landY; 
+                }
+            });
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwL6vY1pA1vqbrq4bCLIVLdWGtKoXztcbxsi812AkzILF3eo54oJnh-fw2MCFttjUoh/exec";
+        let isFetching = false;
+        let knownMissions = {}; 
+        let isFirstLoad = true;
+        let fetchTimeout; 
+        
+        let errorCount = 0;
+
+        async function fetchData() {
+            if (isFetching) return; 
+            isFetching = true;
+            clearTimeout(fetchTimeout);
+
+            try {
+                // ▼ ここです！！さっきのコードでここから「await」が抜け落ちていました…！
+                const response = await fetch(GAS_URL + "?t=" + Date.now(), { cache: 'no-store' });
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const data = await response.json();
+                updateUIAndCheckDrops(data);
+                
+                errorCount = 0;
+                document.getElementById('status').innerText = "SYS: ONLINE";
+                document.getElementById('status').style.color = "#888";
+                
+            } catch (error) {
+                errorCount++;
+                if (errorCount >= 3) {
+                    document.getElementById('status').innerText = "SYS: ERROR";
+                    document.getElementById('status').style.color = "#ff5252";
+                }
+            } finally {
+                setTimeout(() => { isFetching = false; }, 500);
+                fetchTimeout = setTimeout(fetchData, 1500); 
+            }
+        }
+
+        function updateUIAndCheckDrops(data) {
+            let logText = "";
+
+            data.missions.forEach((m, index) => {
+                try {
+                    const uniqueKey = "mission_row_" + index;
+                    const isCleared = (m.cleared === true || String(m.cleared).toUpperCase() === "TRUE");
+
+                    if (isCleared && !knownMissions[uniqueKey]) {
+                        window.dropItem(m.hintImage || ""); 
+                        if (!isFirstLoad) {
+                            logText = "DROP: " + String(m.name || "ITEM").substring(0,6);
+                        }
+                    }
+                    knownMissions[uniqueKey] = isCleared;
+                } catch (err) {
+                }
+            });
+            
+            if (logText) {
+                const logEl = document.getElementById('monitor-log');
+                logEl.innerText = logText;
+                logEl.style.color = "#fff";
+                setTimeout(() => { logEl.style.color = "#00e676"; }, 500);
+            }
+            
+            isFirstLoad = false;
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
