@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POISUTE 2 - TRASH CAM MONITOR</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        body { margin: 0; overflow: hidden; background-color: #000000; color: #fff; font-family: 'Courier New', Courier, monospace; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-sizing: border-box; padding: 20px; z-index: 10; }
         
@@ -20,6 +22,7 @@
         #footer-info { position: absolute; bottom: 20px; right: 30px; font-size: 16px; text-align: right; line-height: 1.5; text-shadow: 1px 1px 3px #000; opacity: 0.5; }
         .debug-text { font-size: 12px; color: #00e676; margin-top: 5px; }
     </style>
+
     <script type="importmap">
         {
             "imports": {
@@ -28,8 +31,11 @@
             }
         }
     </script>
+
 </head>
+
 <body>
+
     <div id="canvas-container"></div>
     <div id="ui-layer">
         <div class="cam-title"><span class="live-icon">● LIVE</span></div>
@@ -45,7 +51,7 @@
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         // ▼ 修正：シーンの背景を真っ黒に
-        scene.background = new THREE.Color(0x000000); 
+        scene.background = new THREE.Color("#969696");
         
         const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 24, 55); 
@@ -57,11 +63,11 @@
         container.appendChild(renderer.domElement);
 
         const boxGeometry = new THREE.BoxGeometry(100, 45, 75);
-        // ▼ 修正：部屋（箱）の色を真っ黒に
-        const boxMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x000000,       
-            side: THREE.BackSide,  
-            roughness: 0.9 
+        // ▼ 部屋の色
+        const boxMaterial = new THREE.MeshStandardMaterial({
+            color: "#000000",
+            side: THREE.BackSide,
+            roughness: 0.9
         });
         const bigBox = new THREE.Mesh(boxGeometry, boxMaterial);
         
@@ -196,7 +202,15 @@
                     item.position.set(posX, 35, posZ);    
                 }
                 
-                item.quaternion.copy(camera.quaternion); 
+               item.quaternion.copy(camera.quaternion);
+
+               // メントスコーラ動画を常に手前に表示する
+                if (isTargetAppear) {
+                    item.renderOrder = 9999;
+                    item.material.depthTest = false;
+                    item.material.depthWrite = false;
+                }
+
                 scene.add(item);
 
                 fallingItems.push({ mesh: item, velocity: 0, landX: posX, landY: landY, landZ: posZ });
